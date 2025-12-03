@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MSD Artist Map by Year</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <style>
+      body {
+        margin: 0;
+        background: #020617;
+        color: #e5e7eb;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+      #container {
+        max-width: 1300px;
+        margin: 0 auto;
+        padding: 1rem 1.5rem 2rem;
+        position: relative; /* for inset positioning */
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.6rem;
+        font-weight: 600;
+      }
+      #controls {
+        margin: 0.5rem 0 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.95rem;
+        flex-wrap: wrap;
+      }
+      #yearSlider {
+        width: 320px;
+      }
+      #playPause {
+        padding: 0.3rem 0.8rem;
+        border-radius: 999px;
+        border: 1px solid #4b5563;
+        background: #111827;
+        color: #e5e7eb;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      #playPause:hover {
+        background: #1f2937;
+      }
+      #yearInfo {
+        opacity: 0.8;
+      }
+      #viewToggle {
+        display: flex;
+        gap: 0.3rem;
+        align-items: center;
+      }
+      #viewToggle button {
+        padding: 0.25rem 0.6rem;
+        font-size: 0.8rem;
+        border-radius: 999px;
+        border: 1px solid #4b5563;
+        background: #020617;
+        color: #e5e7eb;
+        cursor: pointer;
+      }
+      #viewToggle button.active {
+        background: #e11d48;
+        border-color: #fb7185;
+        color: #f9fafb;
+      }
+      svg {
+        display: block;
+        margin: 0 auto;
+        background: #020617;
+        border-radius: 0.5rem;
+      }
+      #map {
+        background: #020617; /* very dark (ocean/outside) */
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+      }
+      /* .country {
+              fill: #0b1120;
+              stroke: #64748b; 
+              stroke-width: 0.7px;
+            }
+            .country:hover {
+              fill: #8c96aa;
+            } */
+
+      .country {
+        fill: #0b1120;
+        stroke: #64748b;
+        stroke-width: 0.7px;
+
+        /* smooth animation + make transforms local to each path */
+        transition: fill 0.2s ease-out, stroke-width 0.2s ease-out,
+          transform 0.2s ease-out, filter 0.2s ease-out;
+        transform-box: fill-box; /* important for SVG paths */
+        transform-origin: center;
+      }
+
+      .country:hover {
+        fill: #111827; /* your existing hover color */
+        stroke-width: 1.2px; /* a bit thicker on hover */
+        transform: scale(1.02); /* slight zoom/pop */
+        filter: drop-shadow(0 0 6px rgba(148, 163, 184, 0.7)); /* soft glow */
+      }
+      .artist-dot {
+        opacity: 0.9;
+        pointer-events: all;
+      }
+      .artist-dot.highlight {
+        stroke: #facc15;
+        stroke-width: 2px;
+      }
+      .density-bubble {
+        pointer-events: all; /* <--- changed so we can hover them */
+      }
+
+      /* Inset popup near hover */
+      #insetContainer {
+        position: absolute;
+        width: 260px;
+        height: 180px;
+        background: #020617;
+        border: 1px solid #4b5563;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        display: none;
+        pointer-events: none;
+        z-index: 10;
+      }
+      #insetTitle {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-bottom: 1px solid #1f2937;
+        color: #9ca3af;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #insetMap {
+        width: 100%;
+        height: calc(100% - 1.1rem);
+        display: block;
+      }
+
+      /* Top locations bar chart */
+      #topLocationsTitle {
+        margin-top: 1.5rem;
+        margin-bottom: 0.3rem;
+        font-size: 1rem;
+        font-weight: 500;
+      }
+      #topLocations {
+        background: #020617;
+      }
+      .bar {
+        fill: #0ea5e9;
+        cursor: pointer;
+      }
+      .bar:hover {
+        fill: #22c55e;
+      }
+      .bar-label {
+        fill: #e5e7eb;
+        font-size: 0.7rem;
+      }
+      .bar-value {
+        fill: #9ca3af;
+        font-size: 0.65rem;
+      }
+      .axis line,
+      .axis path {
+        stroke: #4b5563;
+      }
+      .axis text {
+        fill: #9ca3af;
+        font-size: 0.7rem;
+      }
+
+      /* Legend text */
+      .legend-title {
+        fill: #9ca3af;
+        font-size: 0.7rem;
+      }
+      .legend-label {
+        fill: #9ca3af;
+        font-size: 0.65rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <h1>MSD Artist Origins by Year</h1>
+      <div id="controls">
+        <label for="yearSlider">
+          Year:
+          <span id="yearLabel"></span>
+        </label>
+        <input
+          type="range"
+          id="yearSlider"
+          min="1950"
+          max="2010"
+          step="1"
+          value="2000"
+        />
+        <button id="playPause">▶ Play</button>
+        <span id="yearInfo"></span>
+        <div id="viewToggle">
+          <span style="font-size: 0.8rem; opacity: 0.7">View:</span>
+          <button data-mode="artists" class="active">Artists</button>
+          <button data-mode="density">Density</button>
+        </div>
+      </div>
+
+      <svg id="map"></svg>
+
+      <!-- Inset popup -->
+      <div id="insetContainer">
+        <div id="insetTitle"></div>
+        <svg id="insetMap"></svg>
+      </div>
+
+      <div id="topLocationsTitle">
+        Top artist locations in <span id="topYearLabel"></span>
+      </div>
+      <svg id="topLocations"></svg>
+    </div>
+
+    <script>
+      const width = 1200;
+      const height = 600;
+
+      const svg = d3.select("#map").attr("width", width).attr("height", height);
+
+      const mapGroup = svg.append("g").attr("class", "map-group");
+      const countriesLayer = mapGroup
+        .append("g")
+        .attr("class", "countries-layer");
+      const densityLayer = mapGroup.append("g").attr("class", "density-layer");
+      const dotsLayer = mapGroup.append("g").attr("class", "artist-layer");
+
+      // Glow filter for dots
+      const defs = svg.append("defs");
+      const glow = defs
+        .append("filter")
+        .attr("id", "dotGlow")
+        .attr("x", "-50%")
+        .attr("y", "-50%")
+        .attr("width", "200%")
+        .attr("height", "200%");
+      glow
+        .append("feGaussianBlur")
+        .attr("in", "SourceGraphic")
+        .attr("stdDeviation", 2)
+        .attr("result", "blur");
+      const merge = glow.append("feMerge");
+      merge.append("feMergeNode").attr("in", "blur");
+      merge.append("feMergeNode").attr("in", "SourceGraphic");
+
+      const projection = d3
+        .geoNaturalEarth1()
+        .scale(180)
+        .translate([width / 2, height / 2]);
+
+      const path = d3.geoPath(projection);
+
+      const yearSlider = d3.select("#yearSlider");
+      const yearLabel = d3.select("#yearLabel");
+      const yearInfo = d3.select("#yearInfo");
+      const playButton = d3.select("#playPause");
+      const viewToggle = d3.select("#viewToggle");
+      const insetContainer = d3.select("#insetContainer");
+      const insetTitle = d3.select("#insetTitle");
+      const insetSvg = d3.select("#insetMap");
+
+      const insetWidth = 260;
+      const insetHeight = 180 - 18;
+
+      insetSvg.attr("width", insetWidth).attr("height", insetHeight);
+
+      const topLocationsSvg = d3
+        .select("#topLocations")
+        .attr("width", width)
+        .attr("height", 260);
+      const topYearLabel = d3.select("#topYearLabel");
+
+      const barMargin = { top: 20, right: 20, bottom: 30, left: 140 };
+      const barInnerWidth = width - barMargin.left - barMargin.right;
+      const barInnerHeight = 260 - barMargin.top - barMargin.bottom;
+
+      const barG = topLocationsSvg
+        .append("g")
+        .attr("transform", `translate(${barMargin.left},${barMargin.top})`);
+
+      const xScale = d3.scaleLinear().range([0, barInnerWidth]);
+      const yScale = d3.scaleBand().range([0, barInnerHeight]).padding(0.15);
+
+      const xAxisG = barG
+        .append("g")
+        .attr("class", "axis x-axis")
+        .attr("transform", `translate(0,${barInnerHeight})`);
+      const yAxisG = barG.append("g").attr("class", "axis y-axis");
+
+      let years = [];
+      let dataByYear = new Map();
+      let countriesFeatures = [];
+      let animationTimer = null;
+      let isPlaying = false;
+      let currentYear = null;
+      let currentYearData = [];
+      let currentMode = "artists";
+
+      // for color & pulsing
+      let colorHot = null;
+      let hotThreshold = null;
+      let famThreshold = null;
+
+      // --- zoom state ---
+      let currentTransform = d3.zoomIdentity;
+
+      const zoom = d3
+        .zoom()
+        .scaleExtent([1, 8])
+        .on("zoom", (event) => {
+          currentTransform = event.transform;
+          mapGroup.attr("transform", currentTransform);
+        });
+
+      svg.call(zoom);
+      // custom dblclick to reset
+      svg.on("dblclick.zoom", null);
+      svg.on("dblclick", () => {
+        svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity);
+      });
+
+      function startAnimation() {
+        if (!years.length) return;
+        isPlaying = true;
+        playButton.text("⏸ Pause");
+
+        let idx = years.indexOf(+yearSlider.property("value"));
+        if (idx < 0) idx = 0;
+
+        animationTimer = d3.interval(() => {
+          idx = (idx + 1) % years.length;
+          const year = years[idx];
+          yearSlider.property("value", year);
+          update(year);
+        }, 1000);
+      }
+
+      function stopAnimation() {
+        isPlaying = false;
+        playButton.text("▶ Play");
+        if (animationTimer) {
+          animationTimer.stop();
+          animationTimer = null;
+        }
+      }
+
+      playButton.on("click", () => {
+        if (isPlaying) stopAnimation();
+        else startAnimation();
+      });
+
+      // Pulsing animation for hot artists
+      function pulse(selection) {
+        selection
+          .transition()
+          .duration(800)
+          .attr("r", (d) => Math.min(Math.sqrt(d.n_tracks) + 4, 16))
+          .transition()
+          .duration(800)
+          .attr("r", (d) => Math.min(Math.sqrt(d.n_tracks) + 2, 12))
+          .on("end", function () {
+            d3.select(this).call(pulse);
+          });
+      }
+
+      // Artist-focused inset (dot hover)
+      function showInset(hovered, yearData, event) {
+        const container = document.getElementById("container");
+        const rect = container.getBoundingClientRect();
+
+        let x = event.clientX - rect.left + 12;
+        let y = event.clientY - rect.top + 12;
+
+        const popupWidth = 260;
+        const popupHeight = 180;
+        const maxX = rect.width - popupWidth - 8;
+        const maxY = rect.height - popupHeight - 8;
+        x = Math.max(8, Math.min(x, maxX));
+        y = Math.max(8, Math.min(y, maxY));
+
+        insetContainer
+          .style("left", x + "px")
+          .style("top", y + "px")
+          .style("display", "block");
+
+        insetTitle.text(
+          (hovered.artist_name || hovered.artist_id) +
+            " • " +
+            (hovered.location || "Unknown") +
+            " • " +
+            hovered.year
+        );
+
+        const insetProjection = d3
+          .geoNaturalEarth1()
+          .scale(700)
+          .translate([insetWidth / 2, insetHeight / 2])
+          .center([hovered.lon, hovered.lat]);
+
+        const insetPath = d3.geoPath(insetProjection);
+
+        insetSvg.selectAll("*").remove();
+
+        insetSvg
+          .append("g")
+          .selectAll("path")
+          .data(countriesFeatures)
+          .join("path")
+          .attr("class", "country")
+          .attr("d", insetPath);
+
+        insetSvg
+          .append("g")
+          .selectAll("circle")
+          .data(yearData)
+          .join("circle")
+          .attr("class", "artist-dot")
+          .attr("r", (d) => {
+            const base = Math.sqrt(d.n_tracks) + 1.5;
+            return Math.min(base, 6);
+          })
+          .attr("transform", (d) => {
+            const c = insetProjection([d.lon, d.lat]);
+            if (!c) return "translate(-100,-100)";
+            return `translate(${c[0]},${c[1]})`;
+          })
+          .attr("opacity", (d) =>
+            d.artist_id === hovered.artist_id ? 1 : 0.7
+          );
+
+        insetSvg
+          .append("circle")
+          .datum(hovered)
+          .attr("class", "artist-dot")
+          .attr("r", 7)
+          .attr("stroke", "#f9fafb")
+          .attr("stroke-width", 1.5)
+          .attr("fill", "#e11d48")
+          .attr("transform", (d) => {
+            const c = insetProjection([d.lon, d.lat]);
+            if (!c) return "translate(-100,-100)";
+            return `translate(${c[0]},${c[1]})`;
+          });
+      }
+
+      // Region-focused inset (map hover, not on a dot)
+      function showRegionInset(lon, lat, event) {
+        if (!currentYearData.length || currentYear == null) return;
+
+        const container = document.getElementById("container");
+        const rect = container.getBoundingClientRect();
+
+        let x = event.clientX - rect.left + 12;
+        let y = event.clientY - rect.top + 12;
+
+        const popupWidth = 260;
+        const popupHeight = 180;
+        const maxX = rect.width - popupWidth - 8;
+        const maxY = rect.height - popupHeight - 8;
+        x = Math.max(8, Math.min(x, maxX));
+        y = Math.max(8, Math.min(y, maxY));
+
+        insetContainer
+          .style("left", x + "px")
+          .style("top", y + "px")
+          .style("display", "block");
+
+        // Find which country this (lon, lat) falls into
+        const countryFeature = countriesFeatures.find((f) =>
+          d3.geoContains(f, [lon, lat])
+        );
+        const countryName = countryFeature
+          ? countryFeature.properties.name
+          : "Unknown";
+
+        insetTitle.text(
+          `${countryName} • lat ${lat.toFixed(2)}, lon ${lon.toFixed(
+            2
+          )} • ${currentYear}`
+        );
+
+        const insetProjection = d3
+          .geoNaturalEarth1()
+          .scale(700)
+          .translate([insetWidth / 2, insetHeight / 2])
+          .center([lon, lat]);
+
+        const insetPath = d3.geoPath(insetProjection);
+
+        insetSvg.selectAll("*").remove();
+
+        insetSvg
+          .append("g")
+          .selectAll("path")
+          .data(countriesFeatures)
+          .join("path")
+          .attr("class", "country")
+          .attr("d", insetPath);
+
+        insetSvg
+          .append("g")
+          .selectAll("circle")
+          .data(currentYearData)
+          .join("circle")
+          .attr("class", "artist-dot")
+          .attr("r", (d) => {
+            const base = Math.sqrt(d.n_tracks) + 1.5;
+            return Math.min(base, 6);
+          })
+          .attr("transform", (d) => {
+            const c = insetProjection([d.lon, d.lat]);
+            if (!c) return "translate(-100,-100)";
+            return `translate(${c[0]},${c[1]})`;
+          })
+          .attr("opacity", 0.85);
+      }
+
+      function hideInset() {
+        insetContainer.style("display", "none");
+      }
+
+      // Toggle view mode (artists vs density)
+      viewToggle.selectAll("button").on("click", function () {
+        const mode = this.getAttribute("data-mode");
+        if (mode === currentMode) return;
+        currentMode = mode;
+
+        viewToggle.selectAll("button").classed("active", false);
+        d3.select(this).classed("active", true);
+
+        if (currentMode === "artists") {
+          dotsLayer.style("display", null);
+          densityLayer.style("display", "none");
+        } else {
+          dotsLayer.style("display", "none");
+          densityLayer.style("display", null);
+        }
+      });
+
+      // Density view: grid-based bubbles WITH artist lists
+      function updateDensity(yearData) {
+        const gridX = 24;
+        const gridY = 12;
+        const lonMin = -180;
+        const lonMax = 180;
+        const latMin = -90;
+        const latMax = 90;
+        const cellW = (lonMax - lonMin) / gridX;
+        const cellH = (latMax - latMin) / gridY;
+
+        const cellMap = new Map();
+
+        yearData.forEach((d) => {
+          const ix = Math.floor((d.lon - lonMin) / cellW);
+          const iy = Math.floor((d.lat - latMin) / cellH);
+          if (ix < 0 || ix >= gridX || iy < 0 || iy >= gridY) return;
+          const key = ix + "-" + iy;
+          const prev = cellMap.get(key) || {
+            key,
+            ix,
+            iy,
+            lon: lonMin + (ix + 0.5) * cellW,
+            lat: latMin + (iy + 0.5) * cellH,
+            weight: 0,
+            artists: [],
+          };
+          prev.weight += d.n_tracks;
+          prev.artists.push({
+            name: d.artist_name || d.artist_id,
+            tracks: d.n_tracks,
+          });
+          cellMap.set(key, prev);
+        });
+
+        const cells = Array.from(cellMap.values());
+        if (!cells.length) {
+          densityLayer.selectAll("circle").remove();
+          return;
+        }
+
+        const maxW = d3.max(cells, (d) => d.weight) || 1;
+        const rScale = d3.scaleSqrt().domain([0, maxW]).range([0, 30]);
+        const colorDensity = d3
+          .scaleSequential(d3.interpolateYlOrRd)
+          .domain([0, maxW]);
+
+        const bubbles = densityLayer
+          .selectAll("circle")
+          .data(cells, (d) => d.key);
+
+        bubbles.exit().remove();
+
+        const bubblesEnter = bubbles
+          .enter()
+          .append("circle")
+          .attr("class", "density-bubble");
+
+        const bubblesMerged = bubblesEnter.merge(bubbles);
+
+        bubblesMerged
+          .attr("transform", (d) => {
+            const p = projection([d.lon, d.lat]);
+            if (!p) return "translate(-100,-100)";
+            return `translate(${p[0]},${p[1]})`;
+          })
+          .attr("r", (d) => rScale(d.weight))
+          .attr("fill", (d) => colorDensity(d.weight))
+          .attr("fill-opacity", 0.65)
+          // ---- pop on hover ----
+          .on("mouseover", function (event, d) {
+            d3.select(this)
+              .raise()
+              .transition()
+              .duration(150)
+              .attr("r", rScale(d.weight) * 1.25)
+              .attr("stroke", "#f9fafb")
+              .attr("stroke-width", 1.5);
+          })
+          .on("mouseout", function (event, d) {
+            d3.select(this)
+              .transition()
+              .duration(150)
+              .attr("r", rScale(d.weight))
+              .attr("stroke", null)
+              .attr("stroke-width", null);
+          });
+
+        // tooltip with artist_name: tracks info
+        bubblesMerged.select("title").remove();
+        bubblesMerged.append("title").text((d) => {
+          const totalArtists = d.artists.length;
+          const sortedArtists = d.artists
+            .slice()
+            .sort((a, b) => d3.descending(a.tracks, b.tracks));
+          const top = sortedArtists.slice(0, 5);
+          const lines = [
+            `Total tracks: ${d.weight}`,
+            `Artists in cell: ${totalArtists}`,
+          ];
+          top.forEach((a) => {
+            lines.push(`${a.name}: ${a.tracks}`);
+          });
+          if (sortedArtists.length > 5) {
+            lines.push(`+ ${sortedArtists.length - 5} more ...`);
+          }
+          return lines.join("\n");
+        });
+      }
+
+      // Top locations bar chart
+      function updateTopLocations(year, yearData) {
+        topYearLabel.text(year);
+
+        const byLocation = d3.rollups(
+          yearData,
+          (v) => d3.sum(v, (d) => d.n_tracks),
+          (d) => d.location || "Unknown"
+        );
+
+        const sorted = byLocation
+          .map(([location, count]) => ({ location, count }))
+          .sort((a, b) => d3.descending(a.count, b.count))
+          .slice(0, 10);
+
+        xScale.domain([0, d3.max(sorted, (d) => d.count) || 1]);
+        yScale.domain(sorted.map((d) => d.location));
+
+        xAxisG.call(d3.axisBottom(xScale).ticks(5));
+        // hide default y-axis labels (we draw our own)
+        yAxisG.call(d3.axisLeft(yScale).tickSize(0).tickFormat(""));
+
+        const bars = barG.selectAll(".bar").data(sorted, (d) => d.location);
+        bars.exit().remove();
+
+        const barsEnter = bars
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", 0)
+          .attr("height", yScale.bandwidth())
+          .attr("y", (d) => yScale(d.location))
+          .attr("width", 0);
+
+        const barsMerged = barsEnter.merge(bars);
+
+        barsMerged
+          .transition()
+          .duration(400)
+          .attr("y", (d) => yScale(d.location))
+          .attr("height", yScale.bandwidth())
+          .attr("width", (d) => xScale(d.count));
+
+        // bar labels (location)
+        const labels = barG
+          .selectAll(".bar-label")
+          .data(sorted, (d) => d.location);
+        labels.exit().remove();
+        labels
+          .enter()
+          .append("text")
+          .attr("class", "bar-label")
+          .merge(labels)
+          .attr("x", -6)
+          .attr("y", (d) => yScale(d.location) + yScale.bandwidth() / 2)
+          .attr("dy", "0.32em")
+          .attr("text-anchor", "end")
+          .text((d) => d.location);
+
+        // value labels
+        const values = barG
+          .selectAll(".bar-value")
+          .data(sorted, (d) => d.location);
+        values.exit().remove();
+        values
+          .enter()
+          .append("text")
+          .attr("class", "bar-value")
+          .merge(values)
+          .attr("x", (d) => xScale(d.count) + 4)
+          .attr("y", (d) => yScale(d.location) + yScale.bandwidth() / 2)
+          .attr("dy", "0.32em")
+          .text((d) => d.count);
+
+        // Hover interaction: highlight artists for that location
+        barsMerged
+          .on("mouseover", (event, d) => {
+            const loc = d.location;
+            dotsLayer
+              .selectAll("circle")
+              .classed("highlight", (a) => a.location === loc);
+          })
+          .on("mouseout", () => {
+            dotsLayer.selectAll("circle").classed("highlight", false);
+          });
+      }
+
+      // Color legend for artist hotttnesss
+      function drawHotLegend(minHot, maxHot) {
+        const legendWidth = 200;
+        const legendHeight = 10;
+
+        const gradientId = "legendHotGradient";
+
+        const grad = defs
+          .append("linearGradient")
+          .attr("id", gradientId)
+          .attr("x1", "0%")
+          .attr("y1", "0%")
+          .attr("x2", "100%")
+          .attr("y2", "0%");
+
+        for (let i = 0; i <= 10; i++) {
+          const t = i / 10;
+          grad
+            .append("stop")
+            .attr("offset", `${t * 100}%`)
+            .attr("stop-color", colorHot(minHot + t * (maxHot - minHot)));
+        }
+
+        const legendGroup = svg
+          .append("g")
+          .attr("class", "legend-hot")
+          .attr(
+            "transform",
+            `translate(${width - legendWidth - 40},${
+              height - legendHeight - 40
+            })`
+          );
+
+        legendGroup
+          .append("rect")
+          .attr("width", legendWidth)
+          .attr("height", legendHeight)
+          .attr("fill", `url(#${gradientId})`)
+          .attr("stroke", "#4b5563");
+
+        legendGroup
+          .append("text")
+          .attr("class", "legend-title")
+          .attr("x", 0)
+          .attr("y", -6)
+          .text("Artist hotttnesss");
+
+        legendGroup
+          .append("text")
+          .attr("class", "legend-label")
+          .attr("x", 0)
+          .attr("y", legendHeight + 12)
+          .text(minHot.toFixed(2));
+
+        legendGroup
+          .append("text")
+          .attr("class", "legend-label")
+          .attr("x", legendWidth)
+          .attr("y", legendHeight + 12)
+          .attr("text-anchor", "end")
+          .text(maxHot.toFixed(2));
+      }
+
+      // Load data
+      Promise.all([
+        d3.json(
+          "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
+        ),
+        d3.csv("./Data/msd_artist_location.csv", (row) => {
+          const lat = row.artist_latitude === "" ? NaN : +row.artist_latitude;
+          const lon = row.artist_longitude === "" ? NaN : +row.artist_longitude;
+          const year = +row.year;
+          const artist_hotttnesss =
+            row.artist_hotttnesss === "" ? NaN : +row.artist_hotttnesss;
+          const artist_familiarity =
+            row.artist_familiarity === "" ? NaN : +row.artist_familiarity;
+
+          if (isNaN(lat) || isNaN(lon) || isNaN(year) || year <= 0) return null;
+          return {
+            artist_id: row.artist_id,
+            artist_name: row.artist_name,
+            location: row.artist_location,
+            lat,
+            lon,
+            year,
+            artist_hotttnesss,
+            artist_familiarity,
+          };
+        }),
+      ])
+        .then(([worldData, artistsRaw]) => {
+          const artists = artistsRaw.filter((d) => d !== null);
+
+          const countries = topojson.feature(
+            worldData,
+            worldData.objects.countries
+          );
+          countriesFeatures = countries.features;
+
+          const countryPaths = countriesLayer
+            .selectAll("path")
+            .data(countriesFeatures)
+            .join("path")
+            .attr("class", "country")
+            .attr("d", path);
+
+          // simple tooltip with country name
+          // countryPaths.append("title").text((d) => d.properties.name);
+
+          if (!artists.length) {
+            yearInfo.text(
+              "No valid artist rows with coordinates + year found."
+            );
+            return;
+          }
+
+          // color domain for artist_hotttnesss
+          const hotValues = artists
+            .map((d) => d.artist_hotttnesss)
+            .filter((v) => !isNaN(v));
+          const minHot = d3.min(hotValues) ?? 0;
+          const maxHot = d3.max(hotValues) ?? 1;
+          colorHot = d3
+            .scaleSequential(d3.interpolateTurbo)
+            .domain([minHot, maxHot]);
+          hotThreshold =
+            d3.quantile(hotValues.sort(d3.ascending), 0.9) ?? maxHot;
+
+          const famValues = artists
+            .map((d) => d.artist_familiarity)
+            .filter((v) => !isNaN(v));
+          const maxFam = d3.max(famValues) ?? 1;
+          famThreshold =
+            d3.quantile(famValues.sort(d3.ascending), 0.85) ?? maxFam;
+
+          // draw legend once
+          drawHotLegend(minHot, maxHot);
+
+          dataByYear = new Map();
+          const yearSet = new Set();
+
+          const groupedByYear = d3.group(artists, (d) => d.year);
+          for (const [year, rows] of groupedByYear) {
+            const byArtist = d3
+              .rollups(
+                rows,
+                (v) => ({
+                  artist_id: v[0].artist_id,
+                  artist_name: v[0].artist_name,
+                  location: v[0].location,
+                  lat: v[0].lat,
+                  lon: v[0].lon,
+                  n_tracks: v.length,
+                  year,
+                  artist_hotttnesss: d3.mean(v, (d) => d.artist_hotttnesss),
+                  artist_familiarity: d3.mean(v, (d) => d.artist_familiarity),
+                }),
+                (d) => d.artist_id
+              )
+              .map(([artist_id, agg]) => agg);
+
+            dataByYear.set(year, byArtist);
+            yearSet.add(year);
+          }
+
+          years = Array.from(yearSet).sort(d3.ascending);
+
+          const minYear = years[0];
+          const maxYear = years[years.length - 1];
+          yearSlider
+            .attr("min", minYear)
+            .attr("max", maxYear)
+            .attr("step", 1)
+            .property("value", minYear);
+
+          yearLabel.text(minYear);
+          yearInfo.text(`Available years: ${minYear} – ${maxYear}`);
+
+          function drawDots(year) {
+            const y = +year;
+            currentYear = y;
+            yearLabel.text(y);
+            const yearData = dataByYear.get(y) || [];
+            currentYearData = yearData;
+
+            const circles = dotsLayer
+              .selectAll("circle")
+              .data(yearData, (d) => d.artist_id);
+
+            circles.exit().transition().duration(300).attr("r", 0).remove();
+
+            const circlesEnter = circles
+              .enter()
+              .append("circle")
+              .attr("class", "artist-dot")
+              .attr("r", 0)
+              .attr("transform", (d) => {
+                const coords = projection([d.lon, d.lat]);
+                if (!coords) return "translate(-100,-100)";
+                const [x, y] = coords;
+                return `translate(${x},${y})`;
+              });
+
+            const circlesMerged = circlesEnter.merge(circles);
+
+            // base visual encoding
+            circlesMerged
+              .attr("filter", "url(#dotGlow)")
+              .attr("fill", (d) =>
+                isNaN(d.artist_hotttnesss)
+                  ? "#f97316"
+                  : colorHot(d.artist_hotttnesss)
+              )
+              .attr("stroke", (d) =>
+                d.artist_familiarity >= famThreshold ? "#f9fafb" : null
+              )
+              .attr("stroke-width", (d) =>
+                d.artist_familiarity >= famThreshold ? 1.5 : null
+              );
+
+            // Hover on dots: artist-focused inset
+            circlesMerged
+              .on("mouseover", function (event, d) {
+                d3.select(this)
+                  .attr("stroke", "#f9fafb")
+                  .attr("stroke-width", 2.5);
+
+                showInset(d, yearData, event);
+              })
+              .on("mouseout", function (event, d) {
+                d3.select(this)
+                  .attr(
+                    "stroke",
+                    d.artist_familiarity >= famThreshold ? "#f9fafb" : null
+                  )
+                  .attr(
+                    "stroke-width",
+                    d.artist_familiarity >= famThreshold ? 1.5 : null
+                  );
+                hideInset();
+              });
+
+            // Titles
+            circlesMerged.select("title").remove();
+            circlesMerged.append("title").text(
+              (d) =>
+                `${d.artist_name || d.artist_id}
+${d.location || ""}
+Tracks in ${d.year}: ${d.n_tracks}
+${d.artist_hotttnesss.toFixed(3) || ""}`
+            );
+
+            // wave animation on enter
+            circlesEnter
+              .transition()
+              .delay((d) => ((d.lon || 0) + 180) * 2) // east→west wave
+              .duration(400)
+              .attr("r", (d) => {
+                const base = Math.sqrt(d.n_tracks) + 2;
+                return Math.min(base, 12);
+              });
+
+            circlesMerged
+              .transition()
+              .duration(400)
+              .attr("transform", (d) => {
+                const coords = projection([d.lon, d.lat]);
+                if (!coords) return "translate(-100,-100)";
+                const [x, y] = coords;
+                return `translate(${x},${y})`;
+              })
+              .attr("r", (d) => {
+                const base = Math.sqrt(d.n_tracks) + 2;
+                return Math.min(base, 12);
+              });
+
+            // pulsing for very hot artists
+            const hotSelection = circlesMerged.filter(
+              (d) =>
+                !isNaN(d.artist_hotttnesss) &&
+                d.artist_hotttnesss >= hotThreshold
+            );
+            hotSelection.each(function () {
+              d3.select(this).interrupt();
+            });
+            hotSelection.call(pulse);
+
+            // density layer for this year
+            updateDensity(yearData);
+
+            // top locations bar chart
+            updateTopLocations(y, yearData);
+          }
+
+          window.update = drawDots;
+          drawDots(minYear);
+
+          yearSlider.on("input", function () {
+            if (isPlaying) stopAnimation();
+            drawDots(this.value);
+          });
+
+          // Region hover (with zoom-aware coordinates)
+          svg.on("mousemove", function (event) {
+            const [mx, my] = d3.pointer(event, this);
+            const [ux, uy] = currentTransform.invert([mx, my]);
+            const lonlat = projection.invert([ux, uy]);
+
+            const target = event.target;
+            if (
+              target &&
+              target.tagName &&
+              target.tagName.toLowerCase() === "circle"
+            ) {
+              // dot or density bubble hover handles its own tooltip/inset
+              return;
+            }
+
+            if (!currentYearData.length || !lonlat) {
+              hideInset();
+              return;
+            }
+
+            const [lon, lat] = lonlat;
+            showRegionInset(lon, lat, event);
+          });
+
+          svg.on("mouseleave", () => {
+            hideInset();
+          });
+
+          // Initially, hide density layer (artists mode)
+          densityLayer.style("display", "none");
+        })
+        .catch((err) => {
+          console.error(err);
+          yearInfo.text("Error loading data. Check console.");
+        });
+
+      function update(year) {
+        window.update && window.update(year);
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<title>D3 Template (Dark Card)</title>
+
+<!-- 1) Theme & layout (same look as earlier demos) -->
+<style>
+  :root {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    background: #0e1326; /* page background */
+    color: #e7eaf1;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  }
+  .wrap {
+    padding: 18px 22px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card {
+    background: rgba(255, 255, 255, 0.05); /* translucent “card” */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .sub {
+    color: #9aa3b2;
+    font-size: 13px;
+    margin: 4px 0 10px;
+  }
+  /* The chart surface */
+  #chart {
+    width: 100%;
+    height: 520px; /* change if you want a taller plot */
+    margin-top: 10px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0b1229; /* dark plotting area */
+  }
+  /* Optional axis styling (if you add .axis classes in your code) */
+  .axis path,
+  .axis line {
+    stroke: rgba(255, 255, 255, 0.25);
+  }
+  .axis text {
+    fill: #e7eaf1;
+  }
+</style>
+
+<!-- 2) D3 v4 (same version as your tutorials) -->
+<script src="https://d3js.org/d3.v4.js"></script>
+
+<div class="wrap">
+  <div class="card">
+    <h1 id="title">Your Chart Title</h1>
+    <div class="sub" id="subtitle">Optional subtitle or instructions.</div>
+    <div id="chart"></div>
+  </div>
+</div>
+
+<script>
+  // ====== BASE SVG SETUP (use these in your chart code) ======================
+  // You can keep these names and re-use them across your pages for consistency.
+  var margin = { top: 30, right: 30, bottom: 40, left: 56 };
+
+  // Compute size from the container so it's responsive to width
+  var chartEl = document.getElementById("chart");
+  var rect = chartEl.getBoundingClientRect();
+  var width = rect.width - margin.left - margin.right;
+  var height = rect.height - margin.top - margin.bottom;
+
+  // Create SVG + main group
+  var Svg = d3
+    .select("#chart")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  // Optional: background rect inside the plotting area (rounded)
+  Svg.insert("rect", ":first-child")
+    .attr("width", width)
+    .attr("height", height)
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("fill", "#0b1229")
+    .attr("rx", 12);
+
+  // Optional: defs (gradients, clip-paths). Safe to reuse.
+  var defs = Svg.append("defs");
+
+  // Linear gradient example (use as fill='url(#grad)')
+  var grad = defs
+    .append("linearGradient")
+    .attr("id", "grad")
+    .attr("x1", "0%")
+    .attr("y1", "0%")
+    .attr("x2", "100%")
+    .attr("y2", "100%");
+  grad.append("stop").attr("offset", "0%").attr("stop-color", "#22d3ee");
+  grad.append("stop").attr("offset", "100%").attr("stop-color", "#a78bfa");
+
+  // Clip path you can use for scatter/lines (keeps marks inside plot)
+  defs
+    .append("clipPath")
+    .attr("id", "clip")
+    .append("rect")
+    .attr("width", width)
+    .attr("height", height)
+    .attr("x", 0)
+    .attr("y", 0);
+
+  // Layer you can draw into that’s already clipped
+  var layer = Svg.append("g").attr("clip-path", "url(#clip)");
+
+  // Optionally expose a tiny API for quick experiments in console
+  window.Demo = {
+    Svg: Svg,
+    layer: layer,
+    width: width,
+    height: height,
+    margin: margin,
+  };
+  // ===========================================================================
+  // ====== PASTE YOUR D3 TUTORIAL CODE BELOW THIS LINE ========================
+  // Use the variables above (Svg, layer, width, height, margin).
+  // If you draw axes, consider adding classes so the CSS above styles them:
+  //   Svg.append('g').attr('class','axis axis--x').attr('transform', 'translate(0,'+height+')').call(d3.axisBottom(x));
+  //   Svg.append('g').attr('class','axis axis--y').call(d3.axisLeft(y));
+
+  // Example skeleton for a CSV-based scatter with brush-to-zoom (v4-style):
+  /*
+  d3.csv('relative/path/to.csv', function row(d){
+    // Coerce to numbers; adjust keys if your headers differ
+    d.x = +d.x; d.y = +d.y;
+    return (isFinite(d.x) && isFinite(d.y)) ? d : null;
+  }, function ready(err, data){
+    if (err) { console.error(err); return; }
+    if (!data.length) { console.error('No valid numeric rows'); return; }
+
+    var x = d3.scaleLinear().domain(d3.extent(data, d => d.x)).nice().range([0, width]);
+    var y = d3.scaleLinear().domain(d3.extent(data, d => d.y)).nice().range([height, 0]);
+
+    var xAxis = Svg.append('g').attr('class','axis axis--x')
+      .attr('transform','translate(0,'+height+')').call(d3.axisBottom(x));
+    Svg.append('g').attr('class','axis axis--y').call(d3.axisLeft(y));
+
+    layer.selectAll('circle').data(data).enter().append('circle')
+      .attr('cx', d => x(d.x))
+      .attr('cy', d => y(d.y))
+      .attr('r', 4)
+      .attr('fill', 'url(#grad)')
+      .attr('opacity', 0.85);
+
+    var brush = d3.brushX().extent([[0,0],[width,height]]).on('end', updateChart);
+    layer.append('g').attr('class','brush').call(brush);
+
+    var idleTimeout; function idled(){ idleTimeout = null; }
+    function updateChart(){
+      var sel = d3.event.selection;
+      if(!sel){
+        if(!idleTimeout) return idleTimeout = setTimeout(idled, 350);
+        x.domain(d3.extent(data, d => d.x)).nice();
+      } else {
+        x.domain([ x.invert(sel[0]), x.invert(sel[1]) ]);
+        layer.select('.brush').call(brush.move, null);
+      }
+      xAxis.transition().duration(800).call(d3.axisBottom(x));
+      layer.selectAll('circle').transition().duration(800)
+        .attr('cx', d => x(d.x))
+        .attr('cy', d => y(d.y));
+    }
+  });
+  */
+
+  // ====== PASTE YOUR D3 TUTORIAL CODE ABOVE THIS LINE ========================
+</script>

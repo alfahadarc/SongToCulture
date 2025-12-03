@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>D3 Example 2</title>
+  <style>
+    :root{ color-scheme: dark light }
+    body{ margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0e1326; color:#e7eaf1 }
+    .wrap{ padding:18px 22px }
+    .card{ background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:14px 16px }
+    h1{ font-size:20px; margin:0 0 8px; font-weight:700 }
+    .chart{ width:100%; height:420px; }
+    .sub{ color:#9aa3b2; font-size:13px; margin-top:6px }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>D3 Line Chart — Demo</h1>
+      <div class="sub">Swap this with your real visualization; parent keeps navigation.</div>
+      <div id="chart" class="chart"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script type="module">
+    const el = document.getElementById('chart');
+    const rect = el.getBoundingClientRect();
+    const width = rect.width, height = rect.height;
+
+    const svg = d3.select(el).append('svg').attr('width', width).attr('height', height);
+    const margin = {top: 30, right: 30, bottom: 40, left: 50};
+    const w = width - margin.left - margin.right;
+    const h = height - margin.top - margin.bottom;
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    // Sample timeseries-ish data
+    const data = Array.from({length: 24}, (_, i) => ({ t: i, y: Math.round(40+20*Math.sin(i/3) + Math.random()*10) }));
+
+    const x = d3.scaleLinear().domain(d3.extent(data, d=>d.t)).range([0,w]);
+    const y = d3.scaleLinear().domain([0, d3.max(data, d=>d.y)]).nice().range([h,0]);
+
+    g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x));
+    g.append('g').call(d3.axisLeft(y));
+
+    const line = d3.line().x(d=>x(d.t)).y(d=>y(d.y)).curve(d3.curveCatmullRom.alpha(0.5));
+
+    g.append('path')
+      .attr('d', line(data))
+      .attr('fill','none')
+      .attr('stroke','url(#grad)')
+      .attr('stroke-width',3);
+
+    // gradient
+    const defs = svg.append('defs');
+    const grad = defs.append('linearGradient').attr('id','grad').attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
+    grad.append('stop').attr('offset','0%').attr('stop-color','#22d3ee');
+    grad.append('stop').attr('offset','100%').attr('stop-color','#a78bfa');
+  </script>
+</body>
+</html>

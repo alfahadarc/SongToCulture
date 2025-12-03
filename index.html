@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Presentation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <meta name="color-scheme" content="dark light" />
+    <style>
+      /* Make ONLY p4 bigger/taller */
+      /* Make ONLY #p4 fill the whole slide area */
+      #p4 {
+        padding: 0;
+      } /* remove the page's 24px padding */
+      #p4 .iframe-wrap {
+        margin-top: 100px;
+        width: 100vw; /* edge-to-edge horizontally */
+        height: 100%; /* fill the slide's height */
+        border-radius: 0;
+      }
+      #p4 .iframe-wrap.card {
+        background: transparent; /* remove card chrome */
+        border: none;
+        box-shadow: none;
+      }
+      #p4 .iframe-wrap iframe {
+        width: 100%;
+        height: 100%;
+        display: block;
+        border-radius: 0;
+      }
+      #p5 {
+        padding: 0;
+      } /* remove the page's 24px padding */
+      #p5 .iframe-wrap {
+        margin-left: 100px;
+        margin-top: 100px;
+        width: 100vw; /* edge-to-edge horizontally */
+        height: 100%; /* fill the slide's height */
+        border-radius: 0;
+      }
+      #p5 .iframe-wrap.card {
+        background: transparent; /* remove card chrome */
+        border: none;
+        box-shadow: none;
+      }
+      #p5 .iframe-wrap iframe {
+        width: 100%;
+        height: 100%;
+        display: block;
+        border-radius: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Overlay header with title and controls -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="dot"></span>
+        <span>My Talk</span>
+      </div>
+      <nav class="app-controls">
+        <button id="prevBtn" aria-label="Previous (↑)">Prev</button>
+        <button id="nextBtn" aria-label="Next (↓)">Next</button>
+      </nav>
+    </header>
+
+    <!-- Progress dots (built dynamically) -->
+    <nav id="dotNav" class="dot-nav" aria-label="Slide navigation"></nav>
+
+    <!-- Deck container: each child <section.page> is a "slide" -->
+    <main id="deck" class="deck" tabindex="-1">
+      <!-- Define your pages here in the order you want -->
+      <section
+        class="page"
+        data-type="slide"
+        data-src="pages/slide-1.html"
+        id="p1"
+      ></section>
+      <section
+        class="page"
+        data-type="slide"
+        data-src="pages/slide-2.html"
+        id="p2"
+      ></section>
+
+      <section
+        class="page"
+        data-type="d3"
+        data-src="pages/emot_bubble.html"
+        id="p4"
+      ></section>
+      <section
+        class="page"
+        data-type="d3"
+        data-src="pages/mood.html"
+        id="p5"
+      ></section>
+
+      <section
+        class="page"
+        data-type="d3"
+        data-src="pages/new_artist_map.html"
+        id="p5"
+      ></section>
+      <section
+        class="page"
+        data-type="d3"
+        data-src="pages/d3-xy.html"
+      ></section>
+    </main>
+
+    <!-- Footer progress bar -->
+    <footer class="progress">
+      <div class="bar" id="progressBar"></div>
+    </footer>
+
+    <script type="module" src="assets/js/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Emotion Bubbles by Decade</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #020617; /* dark */
+        color: #e5e7eb;
+      }
+      #chart {
+        width: 100%;
+        height: 100vh;
+        overflow: auto;
+      }
+      text.word-label {
+        fill: #f9fafb;
+        pointer-events: none;
+        text-anchor: middle;
+        dominant-baseline: middle;
+      }
+      .decade-title {
+        fill: #e5e7eb;
+        font-size: 16px;
+        font-weight: 600;
+        text-anchor: middle;
+      }
+      .legend text {
+        fill: #e5e7eb;
+        font-size: 11px;
+      }
+
+      /* Side panel for emotion word bar charts */
+      #emotion-panel {
+        position: fixed;
+        top: 60px;
+        right: 16px;
+        width: 520px; /* <-- panel width */
+        max-height: 85vh; /* <-- panel max height */
+        overflow-y: auto;
+        background: rgba(15, 23, 42, 0.96);
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 11px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      }
+      #emotion-panel h3 {
+        margin: 0 0 4px 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      #emotion-panel .subtitle {
+        margin-bottom: 6px;
+        font-size: 11px;
+        opacity: 0.8;
+      }
+      #emotion-panel .placeholder {
+        font-size: 11px;
+        opacity: 0.7;
+      }
+      .emotion-group {
+        margin-bottom: 8px;
+        border-top: 1px solid #1f2937;
+        padding-top: 4px;
+      }
+      .emotion-group-title {
+        font-weight: 600;
+        font-size: 11px;
+        margin-bottom: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="chart"></div>
+    <div id="emotion-panel">
+      <div class="placeholder">
+        Hover a bubble to see bar charts of words for that emotion across
+        decades.
+      </div>
+    </div>
+
+    <script>
+      // ---------------------------------------------------------
+      // 1. Map decade labels -> your existing CSV files
+      // ---------------------------------------------------------
+      const decadeFiles = {
+        "1920s": "Data/bubbles_1920.csv",
+        "1930s": "Data/bubbles_1930.csv",
+        "1940s": "Data/bubbles_1940.csv",
+        "1950s": "Data/bubbles_1950.csv",
+        "1960s": "Data/bubbles_1960.csv",
+        "1970s": "Data/bubbles_1970.csv",
+        "1980s": "Data/bubbles_1980.csv",
+        "1990s": "Data/bubbles_1990.csv",
+        "2000s": "Data/bubbles_2000.csv",
+        "2010s": "Data/bubbles_2010.csv",
+      };
+
+      const entries = Object.entries(decadeFiles);
+
+      // For panel content: emotion -> [{decade, word, count}, ...]
+      let emotionIndex = new Map();
+
+      // ---------------------------------------------------------
+      // Load ALL decade files
+      // ---------------------------------------------------------
+      Promise.all(
+        entries.map(([label, file]) =>
+          d3.csv(file, d3.autoType).then((rows) => ({ label, rows, file }))
+        )
+      )
+        .then((datasets) => {
+          console.log("Loaded datasets:", datasets);
+
+          // Clean & standardize: remove neutral, aggregate if needed
+          datasets.forEach((ds) => {
+            let rows = ds.rows;
+
+            // Expect columns: word, emotion, count
+            rows = rows.map((d) => ({
+              word: d.word,
+              emotion: d.emotion,
+              count: +d.count || 0,
+            }));
+
+            // Remove neutral
+            rows = rows.filter(
+              (d) =>
+                d.emotion && d.emotion.toLowerCase() !== "neutral" && d.word
+            );
+
+            // Aggregate in case file isn't already aggregated: (word, emotion) -> sum(count)
+            const grouped = d3.rollup(
+              rows,
+              (v) => d3.sum(v, (x) => x.count),
+              (d) => d.word,
+              (d) => d.emotion
+            );
+
+            const flattened = [];
+            for (const [word, emoMap] of grouped.entries()) {
+              for (const [emotion, total] of emoMap.entries()) {
+                flattened.push({ word, emotion, count: total });
+              }
+            }
+
+            const TOP_N = 150; // per decade to keep bubble chart readable
+            ds.data = flattened
+              .sort((a, b) => d3.descending(a.count, b.count))
+              .slice(0, TOP_N)
+              .map((d) => ({
+                ...d,
+                decade: ds.label, // attach decade label for panel
+              }));
+
+            console.log(
+              `Decade ${ds.label} – ${ds.data.length} words after filtering`,
+              ds
+            );
+          });
+
+          // Build global emotionIndex for the panel
+          emotionIndex = new Map();
+          datasets.forEach((ds) => {
+            ds.data.forEach((d) => {
+              if (!emotionIndex.has(d.emotion)) {
+                emotionIndex.set(d.emotion, []);
+              }
+              emotionIndex.get(d.emotion).push({
+                decade: d.decade,
+                word: d.word,
+                count: d.count,
+              });
+            });
+          });
+
+          // Sort each emotion's list by decade then count desc
+          emotionIndex.forEach((arr) => {
+            arr.sort(
+              (a, b) =>
+                a.decade.localeCompare(b.decade) ||
+                d3.descending(a.count, b.count)
+            );
+          });
+
+          // Collect all emotions across decades for color scale
+          const allEmotions = new Set();
+          datasets.forEach((ds) =>
+            ds.data.forEach((d) => allEmotions.add(d.emotion))
+          );
+          const emotions = Array.from(allEmotions).sort();
+          console.log("Emotions:", emotions);
+
+          // Color scale for emotions
+          const emotionColor = d3.scaleOrdinal().domain(emotions).range([
+            "#fbbf24", // 1
+            "#60a5fa", // 2
+            "#f97373", // 3
+            "#a78bfa", // 4
+            "#4ade80", // 5
+            "#f97316", // 6
+            "#22d3ee", // 7
+            "#e11d48", // 8
+            "#a3e635", // 9, fallback
+          ]);
+
+          // Layout parameters
+          const nDecades = datasets.length;
+          const cols = Math.min(4, nDecades); // up to 4 columns
+          const rows = Math.ceil(nDecades / cols);
+
+          const tileWidth = 260;
+          const tileHeight = 260;
+          const paddingX = 40;
+          const paddingY = 60;
+
+          const svgWidth = cols * tileWidth + (cols + 1) * paddingX + 160;
+          const svgHeight = rows * tileHeight + (rows + 1) * paddingY + 40;
+
+          const svg = d3
+            .select("#chart")
+            .append("svg")
+            .attr("width", svgWidth)
+            .attr("height", svgHeight);
+
+          // OPTIONAL: radial gradients + soft shadows for 2D "ball" effect
+          const defs = svg.append("defs");
+
+          const emotionGradId = {};
+          emotions.forEach((emo) => {
+            const base = d3.color(emotionColor(emo) || "#22c55e");
+            if (!base) return;
+            const safe = emo.replace(/\s+/g, "-");
+            const id = `grad-${safe}`;
+            emotionGradId[emo] = id;
+
+            const lighter = base.brighter(1.4);
+            const darker = base.darker(0.9);
+
+            const grad = defs
+              .append("radialGradient")
+              .attr("id", id)
+              .attr("cx", "30%")
+              .attr("cy", "30%")
+              .attr("r", "70%");
+
+            grad
+              .append("stop")
+              .attr("offset", "0%")
+              .attr("stop-color", lighter.formatHex())
+              .attr("stop-opacity", 1);
+
+            grad
+              .append("stop")
+              .attr("offset", "100%")
+              .attr("stop-color", darker.formatHex())
+              .attr("stop-opacity", 1);
+          });
+
+          const shadow = defs
+            .append("filter")
+            .attr("id", "bubbleShadow")
+            .attr("x", "-20%")
+            .attr("y", "-20%")
+            .attr("width", "140%")
+            .attr("height", "140%");
+
+          shadow
+            .append("feDropShadow")
+            .attr("dx", 1.5)
+            .attr("dy", 2)
+            .attr("stdDeviation", 2)
+            .attr("flood-color", "#000000")
+            .attr("flood-opacity", 0.45);
+
+          // Title
+          svg
+            .append("text")
+            .attr("x", svgWidth / 2)
+            .attr("y", 24)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#e5e7eb")
+            .attr("font-size", 20)
+            .attr("font-weight", "600")
+            .text("Emotion Bubble Charts by Decade (neutral removed)");
+
+          // Helper: highlight bubbles for a given emotion/word
+          function updateHighlight(activeEmotion, activeWord) {
+            const nodeSelection = svg.selectAll(".node");
+
+            nodeSelection.each(function (nd) {
+              const circle = d3.select(this).select("circle");
+              const label = d3.select(this).select("text.word-label");
+
+              const baseR = nd.originalR || nd.r;
+
+              let r = baseR;
+              let fillOpacity = 0.9;
+              let labelOpacity = 1.0;
+
+              if (!activeEmotion) {
+                // No selection: reset style
+                r = baseR;
+                fillOpacity = 0.9;
+                labelOpacity = 1.0;
+              } else {
+                const sameEmotion = nd.data.emotion === activeEmotion;
+                const isHovered = sameEmotion && nd.data.word === activeWord;
+
+                if (sameEmotion) {
+                  // Highlight all same-emotion bubbles, extra for hovered one
+                  r = baseR * (isHovered ? 1.3 : 1.15);
+                  fillOpacity = 1.0;
+                  labelOpacity = 1.0;
+                } else {
+                  // Dim others
+                  r = baseR;
+                  fillOpacity = 0.15;
+                  labelOpacity = 0.15;
+                }
+              }
+
+              circle
+                .transition()
+                .duration(200)
+                .attr("r", r)
+                .attr("fill-opacity", fillOpacity);
+
+              label.transition().duration(200).style("opacity", labelOpacity);
+            });
+          }
+
+          // Helper: update side panel content (bar charts) for an emotion
+          // Helper: update side panel content (VERTICAL bar charts) for an emotion
+          function updatePanel(emotion) {
+            const panel = d3.select("#emotion-panel");
+            panel.selectAll("*").remove();
+            const panelNode = document.getElementById("emotion-panel");
+            const panelWidth = panelNode.clientWidth || 320; // read real width
+
+            if (!emotion) {
+              panel
+                .append("div")
+                .attr("class", "placeholder")
+                .text(
+                  "Hover a bubble to see bar charts of words for that emotion across decades."
+                );
+              return;
+            }
+
+            const list = emotionIndex.get(emotion) || [];
+
+            panel.append("h3").text(`Emotion: ${emotion}`);
+            panel
+              .append("div")
+              .attr("class", "subtitle")
+              .text(
+                `${list.length} word entries across decades (top bars per decade shown)`
+              );
+
+            // Group entries by decade label
+            const grouped = d3.groups(list, (d) => d.decade);
+            grouped.sort((a, b) => a[0].localeCompare(b[0]));
+
+            const container = panel.append("div");
+
+            const MAX_BARS_PER_DECADE = 10; // how many words per decade
+            const svgWidth = panelWidth - 30; // width of small chart inside panel
+            const svgHeight = 130; // height of small chart
+            const margin = { top: 20, right: 10, bottom: 45, left: 35 };
+            const innerWidth = svgWidth - margin.left - margin.right;
+            const innerHeight = svgHeight - margin.top - margin.bottom;
+
+            grouped.forEach(([decade, items]) => {
+              const groupDiv = container
+                .append("div")
+                .attr("class", "emotion-group");
+
+              groupDiv
+                .append("div")
+                .attr("class", "emotion-group-title")
+                .text(decade);
+
+              // Sort words by count and take top N
+              const sorted = items
+                .slice()
+                .sort((a, b) => d3.descending(a.count, b.count))
+                .slice(0, MAX_BARS_PER_DECADE);
+
+              if (!sorted.length) {
+                groupDiv
+                  .append("div")
+                  .attr("class", "subtitle")
+                  .text("No data for this decade.");
+                return;
+              }
+
+              const maxCount = d3.max(sorted, (d) => d.count) || 1;
+
+              const svgBars = groupDiv
+                .append("svg")
+                .attr("width", svgWidth)
+                .attr("height", svgHeight);
+
+              const g = svgBars
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+              // X = words (band)
+              const x = d3
+                .scaleBand()
+                .domain(sorted.map((d) => d.word))
+                .range([0, innerWidth])
+                .padding(0.2);
+
+              // Y = count (linear)
+              const y = d3
+                .scaleLinear()
+                .domain([0, maxCount])
+                .nice()
+                .range([innerHeight, 0]);
+
+              // Vertical bars
+              g.selectAll(".bar")
+                .data(sorted)
+                .join("rect")
+                .attr("class", "bar")
+                .attr("x", (d) => x(d.word))
+                .attr("y", (d) => y(d.count))
+                .attr("width", x.bandwidth())
+                .attr("height", (d) => innerHeight - y(d.count))
+                .attr("fill", emotionColor(emotion) || "#22c55e")
+                .attr("fill-opacity", 0.9)
+                .attr("rx", 2)
+                .attr("ry", 2);
+
+              // Counts above bars
+              g.selectAll(".bar-count")
+                .data(sorted)
+                .join("text")
+                .attr("class", "bar-count")
+                .attr("x", (d) => x(d.word) + x.bandwidth() / 2)
+                .attr("y", (d) => y(d.count) - 3)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#9ca3af")
+                .attr("font-size", 9)
+                .text((d) => d.count);
+
+              // Word labels on x-axis (rotated)
+              g.selectAll(".x-label")
+                .data(sorted)
+                .join("text")
+                .attr("class", "x-label")
+                .attr("x", (d) => x(d.word) + x.bandwidth() / 2)
+                .attr("y", innerHeight + 10)
+                .attr("text-anchor", "end")
+                .attr("fill", "#e5e7eb")
+                .attr("font-size", 9)
+                .attr("transform", (d) => {
+                  const xPos = x(d.word) + x.bandwidth() / 2;
+                  const yPos = innerHeight + 10;
+                  return `rotate(-45,${xPos},${yPos})`;
+                })
+                .text((d) => d.word);
+
+              // Optional: simple y-axis gridline (light)
+              const yAxis = d3
+                .axisLeft(y)
+                .ticks(3)
+                .tickSize(-innerWidth)
+                .tickFormat((t) => (t === 0 ? "" : t));
+
+              g.append("g")
+                .attr("class", "y-axis")
+                .call(yAxis)
+                .selectAll("line")
+                .attr("stroke", "#1f2937")
+                .attr("stroke-opacity", 0.7);
+
+              g.selectAll(".y-axis text")
+                .attr("fill", "#9ca3af")
+                .attr("font-size", 8);
+
+              g.selectAll(".y-axis path").attr("stroke", "#1f2937");
+            });
+          }
+
+          // Pack layout template
+          const pack = d3.pack().size([tileWidth, tileHeight]).padding(4);
+
+          // Draw each decade as its own packed bubble chart
+          datasets.forEach((ds, idx) => {
+            const col = idx % cols;
+            const row = Math.floor(idx / cols);
+
+            const originX = paddingX + col * (tileWidth + paddingX);
+            const originY = 40 + paddingY + row * (tileHeight + paddingY);
+
+            const g = svg
+              .append("g")
+              .attr("transform", `translate(${originX},${originY})`);
+
+            if (!ds.data.length) {
+              g.append("text")
+                .attr("class", "decade-title")
+                .attr("x", tileWidth / 2)
+                .attr("y", tileHeight / 2)
+                .text(`${ds.label} (no data)`);
+              return;
+            }
+
+            // Group words by emotion for clustered bubbles
+            const groups = d3.groups(ds.data, (d) => d.emotion);
+
+            const root = d3
+              .hierarchy({
+                children: groups.map(([emotion, words]) => ({
+                  emotion,
+                  children: words,
+                })),
+              })
+              .sum((d) => d.count);
+
+            const packedRoot = pack(root);
+            const leaves = packedRoot.leaves();
+
+            // Store original radius
+            leaves.forEach((d) => {
+              d.originalR = d.r;
+            });
+
+            const nodes = g
+              .selectAll(".node")
+              .data(leaves)
+              .join("g")
+              .attr("class", "node")
+              .attr("transform", (d) => `translate(${d.x},${d.y})`);
+
+            nodes
+              .append("circle")
+              .attr("r", (d) => d.r)
+              .attr("fill", (d) => {
+                const emo = d.data.emotion;
+                const gid = emotionGradId[emo];
+                return gid ? `url(#${gid})` : emotionColor(emo) || "#22c55e";
+              })
+              .attr("fill-opacity", 0.9)
+              .attr("stroke", "#020617")
+              .attr("stroke-width", 1)
+              .attr("filter", "url(#bubbleShadow)")
+              .on("mouseover", function (event, d) {
+                updateHighlight(d.data.emotion, d.data.word);
+                updatePanel(d.data.emotion); // panel stays on last hovered
+              })
+              .on("mouseout", function (event, d) {
+                updateHighlight(null, null); // reset bubbles only
+                // do NOT clear panel here
+              });
+
+            nodes
+              .append("text")
+              .attr("class", "word-label")
+              .text((d) => {
+                if (d.r < 10) return ""; // hide label on tiny bubbles
+                return d.data.word;
+              })
+              .style("font-size", (d) => {
+                const s = d.r * 0.45;
+                return `${Math.max(8, Math.min(s, 16))}px`;
+              })
+              .attr("dy", "0.1em");
+
+            nodes.append("title").text(
+              (d) => `Decade: ${ds.label}
+Word: ${d.data.word}
+Emotion: ${d.data.emotion}
+Count: ${d.data.count}`
+            );
+
+            g.append("text")
+              .attr("class", "decade-title")
+              .attr("x", tileWidth / 2)
+              .attr("y", -16)
+              .text(ds.label);
+          });
+
+          // Legend
+          const legendX = svgWidth - 140;
+          const legendY = 60;
+
+          const legend = svg
+            .append("g")
+            .attr("class", "legend")
+            .attr("transform", `translate(${legendX},${legendY})`);
+
+          legend
+            .append("text")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("font-size", 13)
+            .attr("font-weight", "600")
+            .text("Emotion");
+
+          const items = legend
+            .selectAll(".item")
+            .data(emotions)
+            .join("g")
+            .attr("class", "item")
+            .attr("transform", (d, i) => `translate(0, ${(i + 1) * 18})`);
+
+          items
+            .append("rect")
+            .attr("x", 0)
+            .attr("y", -10)
+            .attr("width", 14)
+            .attr("height", 14)
+            .attr("rx", 3)
+            .attr("fill", (d) => emotionColor(d) || "#6b7280");
+
+          items
+            .append("text")
+            .attr("x", 20)
+            .attr("y", 0)
+            .attr("dy", "0.32em")
+            .text((d) => d);
+        })
+        .catch((err) => {
+          console.error("Error loading CSVs:", err);
+          document.body.insertAdjacentHTML(
+            "beforeend",
+            `<p style="color:red; margin:16px;">Error loading CSVs: ${err}</p>`
+          );
+        });
+    </script>
+  </body>
+</html>

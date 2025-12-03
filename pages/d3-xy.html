@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<title>D3 Template (Dark Card)</title>
+
+<!-- 1) Theme & layout (same look as earlier demos) -->
+<style>
+  :root {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    background: #0e1326; /* page background */
+    color: #e7eaf1;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  }
+  .wrap {
+    padding: 18px 22px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card {
+    background: rgba(255, 255, 255, 0.05); /* translucent “card” */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .sub {
+    color: #9aa3b2;
+    font-size: 13px;
+    margin: 4px 0 10px;
+  }
+  /* The chart surface */
+  #chart {
+    width: 100%;
+    height: 520px; /* change if you want a taller plot */
+    margin-top: 10px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0b1229; /* dark plotting area */
+  }
+  /* Optional axis styling (if you add .axis classes in your code) */
+  .axis path,
+  .axis line {
+    stroke: rgba(255, 255, 255, 0.25);
+  }
+  .axis text {
+    fill: #e7eaf1;
+  }
+</style>
+
+<!-- 2) D3 v4 (same version as your tutorials) -->
+<script src="https://d3js.org/d3.v4.js"></script>
+
+<div class="wrap">
+  <div class="card">
+    <h1 id="title">Your Chart Title</h1>
+    <div class="sub" id="subtitle">Optional subtitle or instructions.</div>
+    <div id="dataviz_brushZoom"></div>
+  </div>
+</div>
+
+<script>
+  var margin = { top: 10, right: 30, bottom: 30, left: 60 },
+    width = 640 - margin.left - margin.right,
+    height = 440 - margin.top - margin.bottom;
+
+  var Svg = d3
+    .select("#dataviz_brushZoom")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  // Load CSV (must be served over http://, not file://)
+  d3.csv(
+    "data/demo.csv",
+    function row(d) {
+      // If your headers aren't exactly x,y, map them here:
+      // d.x = +d.Sepal_Length; d.y = +d.Petal_Length;
+      d.x = +d.x;
+      d.y = +d.y;
+      return isFinite(d.x) && isFinite(d.y) ? d : null; // skip bad rows
+    },
+    function ready(err, data) {
+      if (err) {
+        console.error(err);
+        return;
+      }
+      if (!data.length) {
+        console.error("CSV loaded but no valid numeric rows");
+        return;
+      }
+
+      var x = d3
+        .scaleLinear()
+        .domain(
+          d3.extent(data, function (d) {
+            return d.x;
+          })
+        )
+        .nice()
+        .range([0, width]);
+      var y = d3
+        .scaleLinear()
+        .domain(
+          d3.extent(data, function (d) {
+            return d.y;
+          })
+        )
+        .nice()
+        .range([height, 0]);
+
+      var xAxis = Svg.append("g")
+        .attr("class", "axis axis--x")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x));
+      Svg.append("g").attr("class", "axis axis--y").call(d3.axisLeft(y));
+
+      // Define clip BEFORE using it
+      Svg.append("defs")
+        .append("clipPath")
+        .attr("id", "clip")
+        .append("rect")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("x", 0)
+        .attr("y", 0);
+
+      var scatter = Svg.append("g").attr("clip-path", "url(#clip)");
+
+      // Points
+      scatter
+        .selectAll("circle")
+        .data(data)
+        .enter()
+        .append("circle")
+        .attr("cx", function (d) {
+          return x(d.x);
+        })
+        .attr("cy", function (d) {
+          return y(d.y);
+        })
+        .attr("r", 4)
+        .style("fill", "#22d3ee")
+        .style("opacity", 0.8);
+
+      // Brush (X only)
+      var brush = d3
+        .brushX()
+        .extent([
+          [0, 0],
+          [width, height],
+        ])
+        .on("end", updateChart);
+      scatter.append("g").attr("class", "brush").call(brush);
+
+      var idleTimeout;
+      function idled() {
+        idleTimeout = null;
+      }
+
+      function updateChart() {
+        var extent = d3.event.selection;
+
+        if (!extent) {
+          if (!idleTimeout) return (idleTimeout = setTimeout(idled, 350));
+          x.domain(
+            d3.extent(data, function (d) {
+              return d.x;
+            })
+          ).nice();
+        } else {
+          x.domain([x.invert(extent[0]), x.invert(extent[1])]);
+          scatter.select(".brush").call(brush.move, null);
+        }
+
+        xAxis.transition().duration(800).call(d3.axisBottom(x));
+        scatter
+          .selectAll("circle")
+          .transition()
+          .duration(800)
+          .attr("cx", function (d) {
+            return x(d.x);
+          })
+          .attr("cy", function (d) {
+            return y(d.y);
+          });
+      }
+    }
+  );
+</script>
