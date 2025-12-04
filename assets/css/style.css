@@ -35,6 +35,7 @@ body {
 /* Header */
 .app-header {
   position: fixed;
+  height: 4.5vh;
   top: 12px;
   left: 12px;
   right: 12px;
@@ -90,14 +91,15 @@ body {
 }
 
 .page {
-  height: calc(100dvh - 100px);
+  height: 100dvh;
   scroll-snap-align: start;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+  padding-top: calc(24px + 4.5vh);
   opacity: 0.35;
-  transform: translateY(30px) scale(.98);
+  transform: translateY(0) scale(.98);
   transition: opacity .5s ease, transform .7s cubic-bezier(.2, .62, .2, 1);
 }
 
@@ -117,12 +119,13 @@ body {
 
 /* Iframe wrapper for D3 pages */
 .iframe-wrap {
-  width: min(1200px, 94vw);
-  height: min(70vh, 68dvh);
-  border-radius: 22px;
+  width: 94%;
+  height: 94%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  padding: 0;
   overflow: hidden;
   box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.08)
 }
 
 .iframe-wrap iframe {
