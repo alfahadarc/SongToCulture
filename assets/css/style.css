@@ -35,7 +35,6 @@ body {
 /* Header */
 .app-header {
   position: fixed;
-  height: 4.5vh;
   top: 12px;
   left: 12px;
   right: 12px;
