@@ -358,6 +358,7 @@
           yAxisGroup.call(yAxis);
 
           // Hexbin setup with global extent
+          // === HEXBIN ===
           const hexbin = d3
             .hexbin()
             .x((d) => xScale(d.artist_familiarity))
@@ -368,14 +369,12 @@
               [chartWidth, chartHeight],
             ]);
 
-          // Global max density for consistent color scale
-          const allBins = hexbin(data);
-          const maxBinSize = d3.max(allBins, (b) => b.length) || 1;
-
+          // --- Density scale: declared once, updated per year in render() ---
+          let maxBinSize = 1; // will be updated in render()
           const colorDensity = d3
             .scaleSequential()
             .domain([0, maxBinSize])
-            .interpolator((t) => d3.interpolateCool(0.3 + 0.7 * t)); // use brighter part of inferno
+            .interpolator((t) => d3.interpolateCool(0.3 + 0.7 * t));
 
           // === LEGEND (for density only) ===
           const legend = svg
@@ -438,8 +437,13 @@
 
           // === RENDER FUNCTION ===
           function render(filtered) {
-            // HEXBIN
             const bins = hexbin(filtered);
+
+            // Recompute max density for THIS year / subset
+            maxBinSize = d3.max(bins, (b) => b.length) || 1;
+
+            // Update the color scale domain to this year's range
+            colorDensity.domain([0, maxBinSize]);
 
             const hexPaths = hexLayer
               .selectAll("path")

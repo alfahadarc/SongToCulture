@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Neon Genre Constellation (Slider Sampling)</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        background: #020617;
+        font-family: system-ui, sans-serif;
+        color: #e5e7eb;
+        overflow: hidden;
+      }
+      .sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 260px;
+        height: 100vh;
+        padding: 14px 16px;
+        background: #020617;
+        border-right: 1px solid #1e293b;
+        box-sizing: border-box;
+      }
+      .sidebar h2 {
+        margin: 0 0 4px 0;
+        font-size: 18px;
+      }
+      .sidebar p {
+        margin: 0 0 12px 0;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .control-group {
+        margin-bottom: 12px;
+        font-size: 12px;
+      }
+      .control-group label {
+        display: block;
+        margin-bottom: 4px;
+        color: #9ca3af;
+      }
+      .control-group input[type="range"] {
+        width: 100%;
+      }
+      .control-label {
+        font-size: 11px;
+        color: #6b7280;
+        margin-top: 2px;
+      }
+      .const-panel {
+        margin-top: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #0b1220;
+        border: 1px solid #1f2937;
+        font-size: 12px;
+        min-height: 80px;
+        box-sizing: border-box;
+      }
+      .const-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+      .const-section {
+        margin-top: 6px;
+      }
+      .const-section-title {
+        font-weight: 500;
+        margin-bottom: 2px;
+        color: #9ca3af;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      #chart {
+        position: absolute;
+        left: 260px;
+        top: 0;
+        width: calc(100vw - 260px);
+        height: 100vh;
+        background: radial-gradient(circle at center, #020617 0%, #000 100%);
+      }
+
+      .node {
+        stroke: none;
+        cursor: pointer;
+        opacity: 0.9;
+        transition: opacity 0.15s ease-out, r 0.15s ease-out;
+        pointer-events: auto;
+      }
+      .link {
+        stroke: rgba(148, 163, 184, 0.2);
+        stroke-width: 0.5px;
+        stroke-linecap: round;
+        transition: opacity 0.15s ease-out, stroke-width 0.15s ease-out;
+        pointer-events: none;
+      }
+      .dimmed {
+        opacity: 0.05 !important;
+      }
+      .star-highlight {
+        filter: url(#bubble-strong);
+      }
+      .link-highlight {
+        stroke-width: 1px;
+        stroke: rgba(244, 244, 245, 0.95);
+        filter: url(#link-glow);
+      }
+
+      /* Twinkle only on center star */
+      @keyframes twinkle {
+        0%,
+        100% {
+          opacity: 0.5;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      .blink {
+        animation: twinkle 1.4s infinite ease-in-out;
+      }
+
+      .tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: rgba(15, 23, 42, 0.95);
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        font-size: 11px;
+        color: #e5e7eb;
+        opacity: 0;
+        transition: opacity 0.1s;
+        max-width: 220px;
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.9);
+        backdrop-filter: blur(10px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sidebar">
+      <h2>Neon Constellations</h2>
+      <p>
+        Artists with strong tags (≥100). Color = term, size = familiarity,
+        brightness = hotness. Hover to pop a community.
+      </p>
+
+      <div class="control-group">
+        <label for="sampleSlider">Artist sampling (1 / n)</label>
+        <input
+          id="sampleSlider"
+          type="range"
+          min="1"
+          max="20"
+          step="1"
+          value="10"
+        />
+        <div id="sampleLabel" class="control-label">
+          Using ~1 / 10 of artists (move slider to change)
+        </div>
+      </div>
+
+      <div class="const-panel" id="constPanel">
+        <div class="const-title">Hover a star</div>
+        <div class="const-section">
+          <div class="const-section-title">Center Artist</div>
+          <div id="constArtist">—</div>
+        </div>
+        <div class="const-section">
+          <div class="const-section-title">Community</div>
+          <div id="constNeighbor">—</div>
+        </div>
+        <div class="const-section">
+          <div class="const-section-title">Details</div>
+          <div id="constDetails">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="chart"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+      const width = window.innerWidth - 260;
+      const height = window.innerHeight;
+
+      const svg = d3
+        .select("#chart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      const defs = svg.append("defs");
+
+      // Strong glow only for highlighted stars
+      const bubbleStrong = defs
+        .append("filter")
+        .attr("id", "bubble-strong")
+        .attr("x", "-80%")
+        .attr("y", "-80%")
+        .attr("width", "260%")
+        .attr("height", "260%");
+      bubbleStrong
+        .append("feGaussianBlur")
+        .attr("in", "SourceAlpha")
+        .attr("stdDeviation", 4)
+        .attr("result", "blur");
+      bubbleStrong
+        .append("feColorMatrix")
+        .attr("in", "blur")
+        .attr("type", "matrix")
+        .attr(
+          "values",
+          "0 0 0 0 1  " + "0 0 0 0 1  " + "0 0 0 0 1  " + "0 0 0 0.7 0"
+        )
+        .attr("result", "glowColor");
+      const feMergeStrong = bubbleStrong.append("feMerge");
+      feMergeStrong.append("feMergeNode").attr("in", "glowColor");
+      feMergeStrong.append("feMergeNode").attr("in", "SourceGraphic");
+
+      // Glow for highlighted links
+      const linkGlow = defs
+        .append("filter")
+        .attr("id", "link-glow")
+        .attr("x", "-50%")
+        .attr("y", "-50%")
+        .attr("width", "200%")
+        .attr("height", "200%");
+      linkGlow
+        .append("feGaussianBlur")
+        .attr("stdDeviation", 1.5)
+        .attr("result", "blur");
+      const linkMerge = linkGlow.append("feMerge");
+      linkMerge.append("feMergeNode").attr("in", "blur");
+      linkMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+      // root group for zoom/pan
+      const g = svg.append("g");
+
+      // zoom & pan
+      svg.call(
+        d3
+          .zoom()
+          .scaleExtent([0.2, 5])
+          .on("zoom", (event) => g.attr("transform", event.transform))
+      );
+
+      const tooltip = d3.select("#tooltip");
+      const panelArtist = d3.select("#constArtist");
+      const panelNeighbor = d3.select("#constNeighbor");
+      const panelDetails = d3.select("#constDetails");
+
+      const sampleSlider = document.getElementById("sampleSlider");
+      const sampleLabel = document.getElementById("sampleLabel");
+
+      // Neon-ish palette
+      const neonPalette = [
+        "#00f5ff",
+        "#39ff14",
+        "#ff00ff",
+        "#ff6fff",
+        "#00ff9f",
+        "#ffd60a",
+        "#ff2975",
+        "#00c2ff",
+        "#f5f242",
+        "#ff9f1c",
+        "#7b5cff",
+        "#ff3f6c",
+        "#00f0b5",
+        "#ffea00",
+        "#ff9ff3",
+      ];
+
+      let rawTag = null;
+      let rawSim = null;
+      let rawTrack = null;
+      let sim = null; // force simulation
+
+      Promise.all([
+        d3.csv("./Data/filtered_artist_mbtag_nano.csv"),
+        d3.csv("./Data/filtered_artist_sim.csv"),
+        d3.csv("./Data/filtered_songs.csv"),
+      ])
+        .then(([tagRaw, simRaw, trackRaw]) => {
+          rawTag = tagRaw;
+          rawSim = simRaw;
+          rawTrack = trackRaw;
+
+          console.log("tagRaw rows:", rawTag.length);
+          console.log("simRaw rows :", rawSim.length);
+          console.log("trackRaw rows:", rawTrack.length);
+
+          const initialN = parseInt(sampleSlider.value, 10) || 10;
+          updateSampleLabel(initialN);
+          renderGraph(initialN);
+
+          sampleSlider.addEventListener("input", () => {
+            const n = parseInt(sampleSlider.value, 10) || 10;
+            updateSampleLabel(n);
+            renderGraph(n);
+          });
+        })
+        .catch((err) => {
+          console.error("Error loading data:", err);
+        });
+
+      function updateSampleLabel(n) {
+        sampleLabel.textContent = `Using approximately 1 / ${n} of artists (random subset)`;
+      }
+
+      function renderGraph(sampleDivisor) {
+        if (!rawTag || !rawSim || !rawTrack) return;
+
+        if (sim) {
+          sim.stop();
+          sim = null;
+        }
+        g.selectAll("*").remove();
+
+        let tagRaw = rawTag;
+        const simRaw = rawSim;
+        const trackRaw = rawTrack;
+
+        // --- sampling ---
+        let artistIds = Array.from(new Set(tagRaw.map((d) => d.artist_id)));
+        artistIds = d3.shuffle(artistIds);
+        const MAX_ARTISTS = Math.max(
+          50,
+          Math.floor(artistIds.length / sampleDivisor)
+        );
+        const sampledIds = new Set(artistIds.slice(0, MAX_ARTISTS));
+        tagRaw = tagRaw.filter((d) => sampledIds.has(d.artist_id));
+        const allowedArtists = sampledIds;
+
+        console.log(
+          "sampleDivisor:",
+          sampleDivisor,
+          "MAX_ARTISTS:",
+          MAX_ARTISTS,
+          "Allowed sampled artists:",
+          allowedArtists.size
+        );
+
+        // primary term
+        const artistTerms = d3.group(tagRaw, (d) => d.artist_id);
+        const primaryTerm = new Map();
+        artistTerms.forEach((rows, artistId) => {
+          const counts = d3.rollup(
+            rows,
+            (v) => v.length,
+            (d) => d.term
+          );
+          let best = null,
+            bestC = -1;
+          counts.forEach((c, t) => {
+            if (c > bestC) {
+              bestC = c;
+              best = t;
+            }
+          });
+          if (best) primaryTerm.set(artistId, best);
+        });
+
+        // stats
+        const stats = d3.rollup(
+          trackRaw,
+          (v) => ({
+            name: v[0].artist_name,
+            fam: +d3.max(v, (d) => +d.artist_familiarity || 0),
+            hot: +d3.max(v, (d) => +d.artist_hotttnesss || 0),
+          }),
+          (d) => d.artist_id
+        );
+
+        // nodes
+        const nodes = [];
+        const idToNode = new Map();
+        allowedArtists.forEach((id) => {
+          const st = stats.get(id) || {};
+          const node = {
+            id,
+            name: st.name || id,
+            term: primaryTerm.get(id) || "Unknown",
+            fam: st.fam || 0,
+            hot: st.hot || 0,
+            componentId: -1,
+          };
+          nodes.push(node);
+          idToNode.set(id, node);
+        });
+        console.log("Nodes created:", nodes.length);
+        if (!nodes.length) {
+          console.warn("No nodes after sampling; try a smaller n.");
+          return;
+        }
+
+        // links: 1 neighbor per anchor
+        function buildLinksOneNeighbor() {
+          const edges = [];
+          const byAnchor = d3.group(simRaw, (d) => d.target);
+
+          byAnchor.forEach((rows, anchorId) => {
+            if (!allowedArtists.has(anchorId) || !idToNode.has(anchorId))
+              return;
+
+            const valid = rows.filter(
+              (r) => allowedArtists.has(r.similar) && idToNode.has(r.similar)
+            );
+
+            valid.sort((a, b) => (+b.weight || 0) - (+a.weight || 0));
+            const r = valid[0];
+            if (!r) return;
+
+            const srcNode = idToNode.get(anchorId);
+            const nbrNode = idToNode.get(r.similar);
+            if (!srcNode || !nbrNode) return;
+
+            edges.push({
+              source: srcNode,
+              target: nbrNode,
+              weight: +r.weight || 1,
+            });
+          });
+
+          console.log("Edges (1 neighbor per artist):", edges.length);
+          return edges;
+        }
+
+        const links = buildLinksOneNeighbor();
+        if (!links.length) {
+          console.warn(
+            "No edges after sampling; visualization will be isolated points."
+          );
+        }
+
+        // scales
+        const famExtent = d3.extent(nodes, (d) => d.fam);
+        const hotExtent = d3.extent(nodes, (d) => d.hot);
+
+        const rScale = d3.scaleSqrt().domain(famExtent).range([2, 8]);
+
+        const brightnessScale = d3
+          .scaleLinear()
+          .domain(hotExtent)
+          .range([0.3, 1.0]);
+
+        const termSet = Array.from(new Set(nodes.map((n) => n.term))).sort();
+        const color = d3.scaleOrdinal().domain(termSet).range(neonPalette);
+
+        // neighbor map & components
+        function buildNeighborMap(links) {
+          const neighbors = new Map();
+          nodes.forEach((n) => neighbors.set(n.id, new Set()));
+          links.forEach((l) => {
+            neighbors.get(l.source.id).add(l.target.id);
+            neighbors.get(l.target.id).add(l.source.id);
+          });
+          return neighbors;
+        }
+
+        const neighborsMap = buildNeighborMap(links);
+
+        let currentComponentId = 0;
+        const visited = new Set();
+        nodes.forEach((node) => {
+          if (visited.has(node.id)) return;
+          const stack = [node.id];
+          const compNodes = [];
+
+          while (stack.length > 0) {
+            const cur = stack.pop();
+            if (visited.has(cur)) continue;
+            visited.add(cur);
+            compNodes.push(cur);
+
+            const neigh = neighborsMap.get(cur) || new Set();
+            neigh.forEach((nid) => {
+              if (!visited.has(nid)) stack.push(nid);
+            });
+          }
+
+          compNodes.forEach((id) => {
+            idToNode.get(id).componentId = currentComponentId;
+          });
+          currentComponentId += 1;
+        });
+        console.log("Components:", currentComponentId);
+
+        // draw
+        const linkSel = g
+          .selectAll("line")
+          .data(links)
+          .enter()
+          .append("line")
+          .attr("class", "link");
+
+        const nodeSel = g
+          .selectAll("circle")
+          .data(nodes)
+          .enter()
+          .append("circle")
+          .attr("class", "node")
+          .attr("r", (d) => rScale(d.fam))
+          .attr("fill", (d) => color(d.term))
+          .attr("fill-opacity", (d) => brightnessScale(d.hot))
+          .on("mouseover", (e, d) => handleHover(e, d))
+          .on("mousemove", handleMove)
+          .on("mouseout", handleOut)
+          .call(drag());
+
+        // simulation
+        let tickCount = 0;
+        sim = d3
+          .forceSimulation(nodes)
+          .force(
+            "link",
+            d3
+              .forceLink(links)
+              .id((d) => d.id)
+              .distance(45)
+              .strength(0.6)
+          )
+          .force("charge", d3.forceManyBody().strength(-22))
+          .force("center", d3.forceCenter(width / 2, height / 2))
+          .force(
+            "collide",
+            d3.forceCollide().radius((d) => rScale(d.fam) + 1)
+          )
+          .alpha(1)
+          .alphaDecay(0.08)
+          .on("tick", () => {
+            tickCount += 1;
+
+            linkSel
+              .attr("x1", (d) => d.source.x)
+              .attr("y1", (d) => d.source.y)
+              .attr("x2", (d) => d.target.x)
+              .attr("y2", (d) => d.target.y);
+
+            nodeSel.attr("cx", (d) => d.x).attr("cy", (d) => d.y);
+
+            if (tickCount > 200 || sim.alpha() < 0.02) {
+              sim.stop();
+            }
+          });
+
+        // hover handlers (now in correct closure)
+        function handleHover(event, d) {
+          const compId = d.componentId;
+
+          nodeSel
+            .classed("dimmed", (n) => n.componentId !== compId)
+            .classed("star-highlight", (n) => n.componentId === compId)
+            .classed("blink", (n) => n.id === d.id)
+            .attr("r", (n) =>
+              n.componentId === compId ? rScale(n.fam) * 1.25 : rScale(n.fam)
+            );
+
+          linkSel
+            .classed(
+              "dimmed",
+              (l) =>
+                l.source.componentId !== compId ||
+                l.target.componentId !== compId
+            )
+            .classed(
+              "link-highlight",
+              (l) =>
+                l.source.componentId === compId &&
+                l.target.componentId === compId
+            );
+
+          tooltip.html(`
+      <b>${d.name}</b><br/>
+      Term: ${d.term}<br/>
+      Fam: ${d.fam.toFixed(3)}<br/>
+      Hot: ${d.hot.toFixed(3)}
+    `);
+          tooltip.style("opacity", 1);
+
+          const componentNodes = nodes.filter((n) => n.componentId === compId);
+          const neighborList = componentNodes.filter((n) => n.id !== d.id);
+
+          const mainLine = `${d.name} (${d.term})`;
+          let neighborText = "Only this star in component";
+          if (neighborList.length > 0) {
+            neighborText = neighborList
+              .map((n) => `${n.name} (${n.term})`)
+              .join("<br/>");
+          }
+
+          panelArtist.html(mainLine);
+          panelNeighbor.html(neighborText);
+          panelDetails.html(`
+      Stars in constellation: ${componentNodes.length}<br/>
+      Familiarity (center): ${d.fam.toFixed(3)}<br/>
+      Hotness (center): ${d.hot.toFixed(3)}
+    `);
+        }
+
+        function handleMove(event) {
+          tooltip
+            .style("left", event.pageX + 12 + "px")
+            .style("top", event.pageY - 18 + "px");
+        }
+
+        function handleOut() {
+          tooltip.style("opacity", 0);
+
+          nodeSel
+            .classed("dimmed", false)
+            .classed("star-highlight", false)
+            .classed("blink", false)
+            .attr("r", (d) => rScale(d.fam));
+
+          linkSel.classed("dimmed", false).classed("link-highlight", false);
+
+          panelArtist.html("—");
+          panelNeighbor.html("—");
+          panelDetails.html("—");
+        }
+
+        function drag() {
+          return d3
+            .drag()
+            .on("start", (event, d) => {
+              if (!event.active && sim) {
+                sim.alphaTarget(0.3).restart();
+              }
+              d.fx = d.x;
+              d.fy = d.y;
+            })
+            .on("drag", (event, d) => {
+              d.fx = event.x;
+              d.fy = event.y;
+            })
+            .on("end", (event, d) => {
+              if (!event.active && sim) {
+                sim.alphaTarget(0);
+              }
+              // keep pinned; uncomment next line if you want them to float again:
+              // d.fx = null; d.fy = null;
+            });
+        }
+      }
+
+      function handleMove(event) {
+        tooltip
+          .style("left", event.pageX + 12 + "px")
+          .style("top", event.pageY - 18 + "px");
+      }
+    </script>
+  </body>
+</html>

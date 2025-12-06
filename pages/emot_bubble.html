@@ -115,8 +115,6 @@
         )
       )
         .then((datasets) => {
-          console.log("Loaded datasets:", datasets);
-
           // Clean & standardize: remove neutral, aggregate if needed
           datasets.forEach((ds) => {
             let rows = ds.rows;
@@ -157,11 +155,6 @@
                 ...d,
                 decade: ds.label, // attach decade label for panel
               }));
-
-            console.log(
-              `Decade ${ds.label} – ${ds.data.length} words after filtering`,
-              ds
-            );
           });
 
           // Build global emotionIndex for the panel
@@ -194,7 +187,6 @@
             ds.data.forEach((d) => allEmotions.add(d.emotion))
           );
           const emotions = Array.from(allEmotions).sort();
-          console.log("Emotions:", emotions);
 
           // Color scale for emotions
           const emotionColor = d3.scaleOrdinal().domain(emotions).range([

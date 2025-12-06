@@ -127,8 +127,6 @@
 
       d3.csv(csvFile, d3.autoType)
         .then((raw) => {
-          console.log("Loaded rows:", raw.slice(0, 10));
-
           // Expect: period, emotion, total_count, prop, (optional) top_words
           let data = raw.map((d) => ({
             period: d.period,
@@ -153,9 +151,6 @@
           const emotions = Array.from(new Set(data.map((d) => d.emotion))).sort(
             d3.ascending
           );
-
-          console.log("Periods:", periods);
-          console.log("Emotions:", emotions);
 
           // Color palette by emotion (high-contrast on dark bg)
           const baseEmotionColors = {
