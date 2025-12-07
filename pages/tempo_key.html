@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tempo–Key Galaxy (All Decades)</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      :root {
+        --bg: #020315;
+        --bg-panel: #070822;
+        --accent: #22d3ee;
+        --accent2: #ec4899;
+        --text: #e5e7eb;
+        --muted: #6b7280;
+      }
+
+      * {
+        box-sizing: border-box;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: radial-gradient(
+          circle at top,
+          #020617 0,
+          #020315 40%,
+          #000 100%
+        );
+        color: var(--text);
+        overflow: hidden;
+      }
+
+      #ui {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        padding: 12px 16px;
+        background: rgba(7, 8, 34, 0.9);
+        border-radius: 16px;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+      }
+
+      #ui h1 {
+        margin: 0 0 6px;
+        font-size: 18px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      #ui p {
+        margin: 0 0 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .decade-toggle-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .decade-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        font-size: 11px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.9);
+        cursor: pointer;
+        transition: all 0.18s ease-out;
+      }
+
+      .decade-toggle span.color-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        display: inline-block;
+      }
+
+      .decade-toggle.active {
+        border-color: var(--accent);
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        background: radial-gradient(circle at top left, #0ea5e9 0, #020617 45%);
+        color: #e0f2fe;
+      }
+
+      #legend {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      #legend span.badge {
+        padding: 2px 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        margin-right: 4px;
+      }
+
+      #tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: rgba(15, 23, 42, 0.95);
+        padding: 8px 10px;
+        border-radius: 10px;
+        font-size: 11px;
+        color: var(--text);
+        border: 1px solid rgba(148, 163, 184, 0.6);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        opacity: 0;
+        transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+        transform: translateY(4px);
+        z-index: 10;
+      }
+
+      #tooltip .label {
+        color: var(--muted);
+        margin-right: 4px;
+      }
+
+      svg {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <h1>Tempo–Key Galaxy</h1>
+      <p>
+        Each glow is a tempo–key cluster. Colors = decades. Radius = density.
+      </p>
+      <div class="decade-toggle-group" id="decade-toggles"></div>
+      <div id="legend">
+        <span class="badge">Fill: decade</span>
+        <span class="badge">Glow: major / minor mix</span>
+      </div>
+    </div>
+    <div id="tooltip"></div>
+
+    <script>
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      const svg = d3
+        .select("body")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      const cx = width / 2;
+      const cy = height / 2;
+      const r = Math.min(width, height) * 0.4;
+
+      const tooltip = d3.select("#tooltip");
+
+      function polarX(angle, radius) {
+        return cx + Math.cos(angle) * radius;
+      }
+      function polarY(angle, radius) {
+        return cy + Math.sin(angle) * radius;
+      }
+
+      // --------- defs: soft glow for text labels (cheap) ----------
+      const defs = svg.append("defs");
+
+      const textGlow = defs
+        .append("filter")
+        .attr("id", "text-glow")
+        .attr("x", "-50%")
+        .attr("y", "-50%")
+        .attr("width", "200%")
+        .attr("height", "200%");
+
+      textGlow
+        .append("feGaussianBlur")
+        .attr("in", "SourceGraphic")
+        .attr("stdDeviation", 2)
+        .attr("result", "blur");
+
+      const textMerge = textGlow.append("feMerge");
+      textMerge.append("feMergeNode").attr("in", "blur");
+      textMerge.append("feMergeNode").attr("in", "SourceGraphic");
+      // ------------------------------------------------------------
+
+      d3.csv("./Data/msd_tempo_key_binned_all_decades.csv").then((raw) => {
+        // full dataset
+        const fullData = raw.map((d) => ({
+          decade: +d.decade,
+          key: +d.key,
+          tempo_bin: +d.tempo_bin,
+          count: +d.count,
+          major_ratio: +d.major_ratio,
+          avg_tempo: +d.avg_tempo,
+        }));
+
+        console.log("Galaxy rows:", fullData.length, "sample:", fullData[0]);
+
+        const tempoExtent = d3.extent(fullData, (d) => d.tempo_bin);
+        const allDecades = Array.from(
+          new Set(fullData.map((d) => d.decade))
+        ).sort();
+
+        // ---- scales ----
+        const tempoScale = d3
+          .scaleLinear()
+          .domain([tempoExtent[0] - 5, tempoExtent[1] + 5])
+          .range([0, r]);
+
+        const sizeScale = d3
+          .scaleSqrt()
+          .domain(d3.extent(fullData, (d) => d.count))
+          .range([3, 9]);
+
+        const decadeColor = d3
+          .scaleOrdinal()
+          .domain(allDecades)
+          .range([
+            "#22d3ee",
+            "#ec4899",
+            "#a3e635",
+            "#f97316",
+            "#6366f1",
+            "#facc15",
+            "#e879f9",
+            "#2dd4bf",
+            "#fb7185",
+          ]);
+
+        // which decades are on
+        let activeDecades = new Set(allDecades);
+
+        function getActiveDecades() {
+          // if somehow all are off, fall back to allDecades
+          return activeDecades.size ? Array.from(activeDecades) : allDecades;
+        }
+
+        // helpers to summarize by key / tempo
+        function summarizeKey(keyIndex) {
+          const decs = getActiveDecades();
+          let total = 0;
+          const rows = [];
+
+          decs.forEach((dec) => {
+            const subset = fullData.filter(
+              (d) => d.key === keyIndex && d.decade === dec
+            );
+            const cnt = d3.sum(subset, (d) => d.count);
+            if (cnt > 0) {
+              rows.push({ decade: dec, count: cnt });
+              total += cnt;
+            }
+          });
+          return { total, rows };
+        }
+
+        const TEMPO_BAND_RANGE = 7; // e.g. 90 BPM → 83–97
+
+        function summarizeTempo(tick) {
+          const decs = getActiveDecades();
+          let total = 0;
+          const rows = [];
+
+          decs.forEach((dec) => {
+            const subset = fullData.filter(
+              (d) =>
+                d.decade === dec &&
+                Math.abs(d.tempo_bin - tick) <= TEMPO_BAND_RANGE
+            );
+            const cnt = d3.sum(subset, (d) => d.count);
+            if (cnt > 0) {
+              rows.push({ decade: dec, count: cnt });
+              total += cnt;
+            }
+          });
+          return { total, rows };
+        }
+
+        function showTooltipAt(event, html) {
+          const [x, y] = d3.pointer(event);
+          tooltip
+            .style("left", x + 16 + "px")
+            .style("top", y + 16 + "px")
+            .style("opacity", 1)
+            .style("transform", "translateY(0px)")
+            .html(html);
+        }
+
+        function hideTooltip() {
+          tooltip.style("opacity", 0).style("transform", "translateY(4px)");
+        }
+
+        // ---- background rings & spokes ----
+        const bg = svg.append("g").attr("opacity", 0.18);
+
+        const tempoTicks = [60, 90, 120, 150, 180, 210].filter(
+          (t) => t >= tempoExtent[0] && t <= tempoExtent[1]
+        );
+
+        bg.selectAll("circle.ring")
+          .data(tempoTicks)
+          .enter()
+          .append("circle")
+          .attr("class", "ring")
+          .attr("cx", cx)
+          .attr("cy", cy)
+          .attr("r", (d) => tempoScale(d))
+          .attr("stroke", "#64748b")
+          .attr("stroke-dasharray", "2,4")
+          .attr("fill", "none")
+          .on("mousemove", function (event, d) {
+            const summary = summarizeTempo(d);
+            let rowsHtml = summary.rows
+              .map(
+                (r) => `<div>${r.decade}s: <strong>${r.count}</strong></div>`
+              )
+              .join("");
+            if (!rowsHtml) rowsHtml = "<div>No tracks in active decades.</div>";
+
+            showTooltipAt(
+              event,
+              `
+          <div><span class="label">Tempo band</span>${d}±${TEMPO_BAND_RANGE} BPM</div>
+          <div><span class="label">Total tracks</span>${summary.total}</div>
+          <div style="margin-top:4px;"><span class="label">By decade</span></div>
+          ${rowsHtml}
+        `
+            );
+          })
+          .on("mouseleave", hideTooltip);
+
+        // key spokes
+        bg.selectAll("line.spoke")
+          .data(d3.range(12))
+          .enter()
+          .append("line")
+          .attr("class", "spoke")
+          .attr("x1", (d) => polarX((d / 12) * 2 * Math.PI, 0))
+          .attr("y1", (d) => polarY((d / 12) * 2 * Math.PI, 0))
+          .attr("x2", (d) => polarX((d / 12) * 2 * Math.PI, r + 25))
+          .attr("y2", (d) => polarY((d / 12) * 2 * Math.PI, r + 25))
+          .attr("stroke", "#020617")
+          .attr("stroke-width", 1);
+
+        bg.append("circle")
+          .attr("cx", cx)
+          .attr("cy", cy)
+          .attr("r", r + 28)
+          .attr("stroke", "#0b1120")
+          .attr("fill", "none");
+
+        // key labels with tooltip
+        const keyNames = [
+          "C",
+          "C♯/D♭",
+          "D",
+          "D♯/E♭",
+          "E",
+          "F",
+          "F♯/G♭",
+          "G",
+          "G♯/A♭",
+          "A",
+          "A♯/B♭",
+          "B",
+        ];
+
+        bg.selectAll("text.key-label")
+          .data(d3.range(12))
+          .enter()
+          .append("text")
+          .attr("class", "key-label")
+          .attr("x", (d) => {
+            const angle = (d / 12) * 2 * Math.PI;
+            return polarX(angle, r + 40);
+          })
+          .attr("y", (d) => {
+            const angle = (d / 12) * 2 * Math.PI;
+            return polarY(angle, r + 40);
+          })
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "middle")
+          .attr("filter", "url(#text-glow)")
+          .style("fill", "#f9fafb")
+          .style("font-size", "12px")
+          .style("font-weight", "700")
+          .style("paint-order", "stroke")
+          .style("stroke", "#020617")
+          .style("stroke-width", 1.0)
+          .text((d) => keyNames[d])
+          .on("mousemove", function (event, idx) {
+            const summary = summarizeKey(idx);
+            let rowsHtml = summary.rows
+              .map(
+                (r) => `<div>${r.decade}s: <strong>${r.count}</strong></div>`
+              )
+              .join("");
+            if (!rowsHtml) rowsHtml = "<div>No tracks in active decades.</div>";
+
+            showTooltipAt(
+              event,
+              `
+          <div><span class="label">Key</span>${keyNames[idx]} (code ${idx})</div>
+          <div><span class="label">Total tracks</span>${summary.total}</div>
+          <div style="margin-top:4px;"><span class="label">By decade</span></div>
+          ${rowsHtml}
+        `
+            );
+          })
+          .on("mouseleave", hideTooltip);
+
+        // tempo labels with tooltip
+        bg.selectAll("text.tempo-label")
+          .data(tempoTicks)
+          .enter()
+          .append("text")
+          .attr("class", "tempo-label")
+          .attr("x", (d) => {
+            const angle = -Math.PI / 2.5;
+            return polarX(angle, tempoScale(d));
+          })
+          .attr("y", (d) => {
+            const angle = -Math.PI / 2.5;
+            return polarY(angle, tempoScale(d)) - 10;
+          })
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "middle")
+          .attr("filter", "url(#text-glow)")
+          .style("fill", "#f9fafb")
+          .style("font-size", "12px")
+          .style("font-weight", "700")
+          .style("paint-order", "stroke")
+          .style("stroke", "#020617")
+          .style("stroke-width", 1.2)
+          .text((d) => `${d} BPM`)
+          .on("mousemove", function (event, d) {
+            const summary = summarizeTempo(d);
+            let rowsHtml = summary.rows
+              .map(
+                (r) => `<div>${r.decade}s: <strong>${r.count}</strong></div>`
+              )
+              .join("");
+            if (!rowsHtml) rowsHtml = "<div>No tracks in active decades.</div>";
+
+            showTooltipAt(
+              event,
+              `
+          <div><span class="label">Tempo band</span>${d}±${TEMPO_BAND_RANGE} BPM</div>
+          <div><span class="label">Total tracks</span>${summary.total}</div>
+          <div style="margin-top:4px;"><span class="label">By decade</span></div>
+          ${rowsHtml}
+        `
+            );
+          })
+          .on("mouseleave", hideTooltip);
+
+        // ---- dots group (will be updated when chips change) ----
+        const dotsGroup = svg.append("g").attr("class", "dots");
+
+        function renderDots() {
+          const active = getActiveDecades();
+          const filtered = fullData.filter((d) => active.includes(d.decade));
+
+          const dots = dotsGroup
+            .selectAll("circle.dot")
+            .data(filtered, (d) => `${d.decade}-${d.key}-${d.tempo_bin}`);
+
+          // exit
+          dots.exit().transition().duration(150).attr("r", 0).remove();
+
+          // enter
+          const dotsEnter = dots
+            .enter()
+            .append("circle")
+            .attr("class", "dot")
+            .attr("cx", (d) => {
+              const angle = (d.key / 12) * 2 * Math.PI;
+              return polarX(angle, tempoScale(d.tempo_bin));
+            })
+            .attr("cy", (d) => {
+              const angle = (d.key / 12) * 2 * Math.PI;
+              return polarY(angle, tempoScale(d.tempo_bin));
+            })
+            .attr("r", 0)
+            .style("fill", (d) => decadeColor(d.decade))
+            .style("stroke", (d) =>
+              d.major_ratio >= 0.5 ? "#f9fafb" : "#020617"
+            )
+            .style(
+              "stroke-width",
+              (d) => 0.5 + 1.5 * Math.abs(d.major_ratio - 0.5)
+            )
+            .style("opacity", 1.0)
+            .on("mousemove", function (event, d) {
+              const [x, y] = d3.pointer(event);
+              tooltip
+                .style("left", x + 16 + "px")
+                .style("top", y + 16 + "px")
+                .style("opacity", 1)
+                .style("transform", "translateY(0px)").html(`
+              <div><span class="label">Decade</span>${d.decade}s</div>
+              <div><span class="label">Key</span>${d.key}</div>
+              <div><span class="label">Tempo bin</span>${d.tempo_bin} BPM</div>
+              <div><span class="label">Tracks</span>${d.count}</div>
+              <div><span class="label">Major ratio</span>${(
+                d.major_ratio * 100
+              ).toFixed(1)}%</div>
+            `);
+
+              d3.select(this)
+                .raise()
+                .transition()
+                .duration(120)
+                .attr("r", sizeScale(d.count) * 1.6);
+            })
+            .on("mouseleave", function (event, d) {
+              hideTooltip();
+              d3.select(this)
+                .transition()
+                .duration(150)
+                .attr("r", sizeScale(d.count));
+            });
+
+          // update existing + entering
+          dotsEnter
+            .merge(dots)
+            .transition()
+            .duration(200)
+            .attr("cx", (d) => {
+              const angle = (d.key / 12) * 2 * Math.PI;
+              return polarX(angle, tempoScale(d.tempo_bin));
+            })
+            .attr("cy", (d) => {
+              const angle = (d.key / 12) * 2 * Math.PI;
+              return polarY(angle, tempoScale(d.tempo_bin));
+            })
+            .attr("r", (d) => sizeScale(d.count))
+            .style("fill", (d) => decadeColor(d.decade));
+        }
+
+        // ---- decade chips now actually FILTER dots ----
+        function createDecadeToggles() {
+          const container = d3.select("#decade-toggles");
+          if (container.empty()) return;
+
+          const toggles = container
+            .selectAll(".decade-toggle")
+            .data(allDecades)
+            .enter()
+            .append("button")
+            .attr("class", "decade-toggle active")
+            .attr("data-decade", (d) => d)
+            .html(
+              (d) => `
+          <span class="color-dot"
+            style="background:${decadeColor(d)};
+                   box-shadow:0 0 8px ${decadeColor(d)};"></span>
+          <span>${d}s</span>
+        `
+            );
+
+          toggles.on("click", function (event, dec) {
+            if (activeDecades.has(dec)) {
+              activeDecades.delete(dec);
+              d3.select(this).classed("active", false);
+            } else {
+              activeDecades.add(dec);
+              d3.select(this).classed("active", true);
+            }
+            renderDots();
+          });
+        }
+
+        createDecadeToggles();
+        renderDots(); // initial render
+      });
+    </script>
+  </body>
+</html>
