@@ -100,6 +100,7 @@
         "2000s": "Data/bubbles_2000.csv",
         "2010s": "Data/bubbles_2010.csv",
       };
+      const stopwordsPath = "Data/stopwords.json";
 
       const entries = Object.entries(decadeFiles);
 
@@ -107,29 +108,41 @@
       let emotionIndex = new Map();
 
       // ---------------------------------------------------------
-      // Load ALL decade files
+      // Load stopwords + ALL decade files
       // ---------------------------------------------------------
-      Promise.all(
-        entries.map(([label, file]) =>
-          d3.csv(file, d3.autoType).then((rows) => ({ label, rows, file }))
-        )
-      )
-        .then((datasets) => {
+      Promise.all([
+        d3.json(stopwordsPath),
+        Promise.all(
+          entries.map(([label, file]) =>
+            d3.csv(file, d3.autoType).then((rows) => ({ label, rows, file }))
+          )
+        ),
+      ])
+        .then(([stopwordsRaw, datasets]) => {
+          const stopwords = new Set(
+            (stopwordsRaw || []).map((w) => String(w).toLowerCase())
+          );
+
           // Clean & standardize: remove neutral, aggregate if needed
           datasets.forEach((ds) => {
             let rows = ds.rows;
 
             // Expect columns: word, emotion, count
             rows = rows.map((d) => ({
-              word: d.word,
-              emotion: d.emotion,
+              word: d.word == null ? "" : String(d.word),
+              emotion: d.emotion == null ? "" : String(d.emotion),
               count: +d.count || 0,
             }));
 
             // Remove neutral
             rows = rows.filter(
-              (d) =>
-                d.emotion && d.emotion.toLowerCase() !== "neutral" && d.word
+              (d) => {
+                if (!d.word || !d.emotion) return false;
+                const wordLower = d.word.toLowerCase();
+                const isStopword = stopwords.has(wordLower);
+                const isNeutral = d.emotion.toLowerCase() === "neutral";
+                return !isNeutral && !isStopword;
+              }
             );
 
             // Aggregate in case file isn't already aggregated: (word, emotion) -> sum(count)
@@ -622,10 +635,10 @@ Count: ${d.data.count}`
             .text((d) => d);
         })
         .catch((err) => {
-          console.error("Error loading CSVs:", err);
+          console.error("Error loading CSVs or stopwords:", err);
           document.body.insertAdjacentHTML(
             "beforeend",
-            `<p style="color:red; margin:16px;">Error loading CSVs: ${err}</p>`
+            `<p style="color:red; margin:16px;">Error loading CSVs or stopwords: ${err}</p>`
           );
         });
     </script>
