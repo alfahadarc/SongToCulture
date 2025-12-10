@@ -1,0 +1,935 @@
+<meta charset="UTF-8" />
+<title>Emotion Radar</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg: linear-gradient(180deg, #0b163c 0%, #050814 100%);
+    --card: rgba(255, 255, 255, 0.06);
+    --card-border: rgba(255, 255, 255, 0.12);
+    --text: #e8ecf3;
+    --muted: #9aa3b2;
+    --accent: #22d3ee;
+    --accent-2: #fb7185;
+    --shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    font-family: "Space Grotesk", "Inter", system-ui, -apple-system, Segoe UI,
+      Roboto, Helvetica, Arial;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .page {
+    padding: 26px 26px 36px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    gap: 18px;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    margin-bottom: 18px;
+  }
+  .eyebrow {
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--accent);
+    margin: 0 0 6px 0;
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-weight: 700;
+    font-size: clamp(26px, 3.8vw, 36px);
+  }
+  .lede {
+    margin: 0;
+    color: var(--muted);
+    max-width: 780px;
+    line-height: 1.5;
+  }
+  .control-panel {
+    /* background: rgba(255, 255, 255, 0.05); */
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    /* box-shadow: var(--shadow); */
+    /* width: 38%; */
+  }
+  .play-btn {
+    background: linear-gradient(120deg, #22d3ee, #a855f7);
+    color: #0b1020;
+    border: none;
+    padding: 9px 14px;
+    border-radius: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(34, 211, 238, 0.25);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .play-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(168, 85, 247, 0.25);
+  }
+  .mode-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .mode-toggle label {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--card-border);
+    padding: 7px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .mode-toggle input {
+    accent-color: var(--accent);
+  }
+  .mode-toggle label:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+  }
+  .selectors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .picker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .picker label {
+    font-weight: 600;
+    color: var(--text);
+  }
+  select {
+    background: #0f172a;
+    color: var(--text);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    outline: none;
+  }
+  select:focus {
+    border-color: var(--accent);
+  }
+  .content {
+    display: grid;
+    grid-template-columns: 1.4fr 0.9fr;
+    gap: 18px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+  .chart-card {
+    min-height: 640px;
+    position: relative;
+  }
+  #radar {
+    width: 100%;
+    height: 620px;
+    position: relative;
+  }
+  #radar svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  #status {
+    position: absolute;
+    left: 14px;
+    top: 12px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .pill-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent);
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .chart-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .chart-subtitle {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  #status {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .info {
+    display: grid;
+    gap: 10px;
+  }
+  .info-box {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 12px;
+  }
+  .info-title {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .info-body {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 13px;
+  }
+  .stat-row strong {
+    color: var(--text);
+  }
+  .bars {
+    display: grid;
+    gap: 8px;
+  }
+  .bar {
+    display: grid;
+    gap: 6px;
+  }
+  .bar-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .bar-fill {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+  .bar-fill span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    transition: width 420ms ease-in-out, background-color 200ms ease;
+  }
+  .hidden {
+    display: none !important;
+  }
+  @media (max-width: 1080px) {
+    .content {
+      grid-template-columns: 1fr;
+    }
+    #radar {
+      height: 520px;
+    }
+    .chart-card {
+      min-height: 540px;
+    }
+  }
+  @media (max-width: 720px) {
+    header {
+      flex-direction: column;
+    }
+    .control-panel {
+      width: 100%;
+    }
+  }
+</style>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <!-- <div class="eyebrow">Lyric emotion radar</div> -->
+        <h1>Lyric Emotion Radar</h1>
+      </div>
+      </header>
+
+    <div class="content">
+      <section class="card chart-card">
+        <div class="card-header">
+          <div>
+            <p class="chart-title" id="chart-title">Emotion profile</p>
+            <p class="chart-subtitle" id="chart-subtitle"></p>
+          </div>
+          <div class="pill" id="active-pill">
+            <span class="pill-dot"></span><span id="pill-label">Decade</span>
+          </div>
+        </div>
+        <div id="radar">
+          <div id="status">Loading data…</div>
+        </div>
+      </section>
+
+      <aside class="card info">
+      <div class="control-panel">
+        <div class="mode-toggle" id="mode-toggle">
+          <label
+            ><input type="radio" name="mode" value="song" /> Song</label
+          >
+          <label
+            ><input type="radio" name="mode" value="year" /> Year</label
+          >
+          <label
+            ><input type="radio" name="mode" value="decade" checked />
+            Decade</label
+          >
+          <button id="play-btn" class="play-btn" aria-label="Play / pause autoplay">
+            ▶ Play
+          </button>
+        </div>
+          <div class="selectors">
+            <div class="picker song-picker">
+              <label for="song-select">Song</label>
+              <select id="song-select"></select>
+            </div>
+          <div class="picker year-picker">
+            <label for="year-select">Year</label>
+            <select id="year-select"></select>
+          </div>
+            <div class="picker decade-picker">
+              <label for="decade-select">Decade</label>
+              <select id="decade-select"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <p class="info-title">Selection details</p>
+          <div class="info-body" id="selection-info">
+            Choose a song, year, or decade to view its emotion mix.
+          </div>
+          <div class="stat-row">
+            <span>Entries used</span><strong id="stat-count">—</strong>
+          </div>
+          <div class="stat-row">
+            <span>Strongest emotion</span><strong id="stat-top">—</strong>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <p class="info-title">Emotion levels</p>
+          <div class="bars" id="emotion-bars"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const emotionKeys = [
+      "joy",
+      "love",
+      "nostalgia",
+      "neutral",
+      "sadness",
+      "fear",
+      "anger",
+    ];
+
+    const emotionColors = {
+      joy: "#facc15",
+      love: "#fb7185",
+      nostalgia: "#38bdf8",
+      neutral: "#a3a3a3",
+      sadness: "#60a5fa",
+      fear: "#a855f7",
+      anger: "#f97316",
+    };
+
+      const state = {
+        mode: "decade",
+        selectedSong: null,
+        selectedYear: null,
+        selectedDecade: null,
+        songs: [],
+        songOrder: [],
+        yearOrder: [],
+        decadeOrder: [],
+        songsByYear: new Map(),
+        songsByDecade: new Map(),
+        songMap: new Map(),
+        isPlaying: false,
+        timerId: null,
+      };
+
+      const svgWidth = 760;
+      const svgHeight = 620;
+      const radius = Math.min(svgWidth, svgHeight) / 2 - 46;
+    const angleSlice = (Math.PI * 2) / emotionKeys.length;
+    const maxValue = 1; // emotion values are in [0,1]
+    const rScale = d3.scaleLinear().domain([0, maxValue]).range([0, radius]);
+
+    const svg = d3
+      .select("#radar")
+      .append("svg")
+      .attr("viewBox", [-svgWidth / 2, -svgHeight / 2, svgWidth, svgHeight])
+      .attr("preserveAspectRatio", "xMidYMid meet");
+
+    const chartLayer = svg.append("g");
+    const gridLayer = chartLayer.append("g").attr("class", "grid-layer");
+    const axesLayer = chartLayer.append("g").attr("class", "axes-layer");
+    const areaLayer = chartLayer.append("g").attr("class", "area-layer");
+    const dotsLayer = chartLayer.append("g").attr("class", "dots-layer");
+
+    const radarLine = d3
+      .lineRadial()
+      .curve(d3.curveCatmullRomClosed.alpha(0.8))
+      .radius((d) => rScale(d.value))
+      .angle((d) => d.angle);
+
+    const statusEl = document.getElementById("status");
+    const barsEl = document.getElementById("emotion-bars");
+    const selectionInfoEl = document.getElementById("selection-info");
+    const statCountEl = document.getElementById("stat-count");
+    const statTopEl = document.getElementById("stat-top");
+    const chartTitleEl = document.getElementById("chart-title");
+      const chartSubtitleEl = document.getElementById("chart-subtitle");
+      const pillLabelEl = document.getElementById("pill-label");
+      const songSelect = document.getElementById("song-select");
+      const yearSelect = document.getElementById("year-select");
+      const decadeSelect = document.getElementById("decade-select");
+      const playBtn = document.getElementById("play-btn");
+      const barCache = new Map();
+
+      const zeroValues = emotionKeys.reduce((acc, key) => {
+        acc[key] = 0;
+        return acc;
+      }, {});
+
+      const PLAY_INTERVAL = 800;
+
+      buildRadarBase();
+
+    init().catch((err) => {
+      console.error(err);
+      statusEl.textContent = "Could not load data.";
+    });
+
+    async function init() {
+      const emotionRows = await d3.csv(
+        "Data/msd_emotion_songs.csv",
+        parseEmotionRow
+      );
+
+      const trackIds = new Set(emotionRows.map((d) => d.track_id));
+
+      // Only keep metadata rows for tracks that have emotion scores.
+      const metaRows = await d3.csv("Data/filtered_songs.csv", (d) => {
+        if (!trackIds.has(d.track_id)) return null;
+        const yearVal = +d.year;
+        return {
+          track_id: d.track_id,
+          title: d.title,
+          artist_name: d.artist_name,
+          release: d.release,
+          year: Number.isFinite(yearVal) ? yearVal : null,
+        };
+      });
+
+      const metaMap = new Map(metaRows.map((d) => [d.track_id, d]));
+
+      state.songs = emotionRows.map((row) => {
+        const meta = metaMap.get(row.track_id) || {};
+        const year = meta.year ?? null;
+        const decade = Number.isFinite(year) ? Math.floor(year / 10) * 10 : null;
+        return {
+          ...row,
+          title: meta.title || "Unknown title",
+          artist_name: meta.artist_name || "Unknown artist",
+          release: meta.release || "",
+          year,
+          decade,
+        };
+      });
+
+      state.songMap = new Map(state.songs.map((d) => [d.track_id, d]));
+      state.songsByYear = d3.group(state.songs, (d) => d.year);
+      state.songsByDecade = d3.group(state.songs, (d) => d.decade);
+
+      populateControls();
+      attachEvents();
+
+      // Default view: latest available decade if present
+      const decades = Array.from(state.songsByDecade.keys()).filter(
+        (d) => d != null
+      );
+      decades.sort(d3.ascending);
+      const defaultDecade = decades.includes(2000) ? 2000 : decades[0];
+      state.selectedDecade = defaultDecade;
+      decadeSelect.value = String(defaultDecade);
+      setMode("decade");
+      updateView();
+    }
+
+    function buildRadarBase() {
+      gridLayer.selectAll("*").remove();
+      axesLayer.selectAll("*").remove();
+
+      const ticks = [0.2, 0.4, 0.6, 0.8, 1];
+      ticks.forEach((t) => {
+        gridLayer
+          .append("circle")
+          .attr("r", rScale(t))
+          .attr("fill", "none")
+          .attr("stroke", "rgba(255,255,255,0.08)");
+        gridLayer
+          .append("text")
+          .attr("x", 6)
+          .attr("y", -rScale(t) + 4)
+          .attr("fill", "rgba(255,255,255,0.5)")
+          .attr("font-size", 11)
+          .text(t.toFixed(1));
+      });
+
+      const axisGroups = axesLayer
+        .selectAll("g")
+        .data(emotionKeys)
+        .enter()
+        .append("g");
+
+      axisGroups
+        .append("line")
+        .attr("x1", 0)
+        .attr("y1", 0)
+        .attr("x2", (d, i) => rScale(maxValue) * Math.sin(angleSlice * i))
+        .attr("y2", (d, i) => -rScale(maxValue) * Math.cos(angleSlice * i))
+        .attr("stroke", "rgba(255,255,255,0.2)")
+        .attr("stroke-width", 1);
+
+      axisGroups
+        .append("text")
+        .attr("text-anchor", (d, i) =>
+          Math.sin(angleSlice * i) > 0.1
+            ? "start"
+            : Math.sin(angleSlice * i) < -0.1
+            ? "end"
+            : "middle"
+        )
+        .attr("x", (d, i) => (rScale(maxValue) + 12) * Math.sin(angleSlice * i))
+        .attr("y", (d, i) => -(rScale(maxValue) + 12) * Math.cos(angleSlice * i))
+        .attr("fill", "white")
+        .attr("font-size", 13)
+        .attr("font-weight", 600)
+        .text((d) => formatLabel(d));
+    }
+
+    function parseEmotionRow(d) {
+      const out = { track_id: d.track_id };
+      emotionKeys.forEach((k) => {
+        const val = +d[k];
+        out[k] = Number.isFinite(val) ? val : 0;
+      });
+      out.known_song = String(d.known_song).toLowerCase() === "true";
+      return out;
+    }
+
+    function populateControls() {
+        const songsSorted = state.songs
+          .slice()
+          .sort(
+            (a, b) =>
+              d3.descending(a.year ?? 0, b.year ?? 0) ||
+              d3.ascending(a.artist_name, b.artist_name) ||
+              d3.ascending(a.title, b.title)
+          );
+        state.songOrder = songsSorted;
+
+        songSelect.innerHTML = "";
+        songsSorted.forEach((s, idx) => {
+          const opt = document.createElement("option");
+          opt.value = s.track_id;
+        opt.textContent = `${s.title} — ${s.artist_name} (${s.year ?? "n/a"})`;
+        if (idx === 0) {
+          state.selectedSong = s.track_id;
+        }
+        songSelect.appendChild(opt);
+      });
+
+        const years = Array.from(state.songsByYear.keys())
+          .filter((d) => d != null)
+          .sort(d3.ascending);
+        state.yearOrder = years;
+        yearSelect.innerHTML = "";
+        years.forEach((y, idx) => {
+          const opt = document.createElement("option");
+          opt.value = y;
+          opt.textContent = y;
+        if (idx === 0) {
+          state.selectedYear = y;
+        }
+        yearSelect.appendChild(opt);
+      });
+
+        const decades = Array.from(state.songsByDecade.keys())
+          .filter((d) => d != null)
+          .sort(d3.ascending);
+        state.decadeOrder = decades;
+        decadeSelect.innerHTML = "";
+        decades.forEach((d, idx) => {
+          const opt = document.createElement("option");
+          opt.value = d;
+        opt.textContent = `${d}s`;
+        if (idx === 0) {
+          state.selectedDecade = d;
+        }
+        decadeSelect.appendChild(opt);
+      });
+    }
+
+      function attachEvents() {
+        document.querySelectorAll('input[name="mode"]').forEach((input) => {
+          input.addEventListener("change", (e) => {
+            setMode(e.target.value);
+            updateView();
+          });
+        });
+
+        songSelect.addEventListener("change", (e) => {
+          state.selectedSong = e.target.value;
+          if (state.mode === "song") updateView();
+        });
+
+        yearSelect.addEventListener("change", (e) => {
+          state.selectedYear = Number(e.target.value);
+          if (state.mode === "year") updateView();
+        });
+
+        decadeSelect.addEventListener("change", (e) => {
+          state.selectedDecade = Number(e.target.value);
+          if (state.mode === "decade") updateView();
+        });
+
+        playBtn.addEventListener("click", () => {
+          togglePlayback();
+        });
+      }
+
+      function setMode(mode) {
+        stopPlayback();
+        state.mode = mode;
+        document.querySelectorAll(".song-picker, .year-picker, .decade-picker").forEach((el) => {
+          el.classList.add("hidden");
+        });
+        if (mode === "song") {
+        document.querySelector(".song-picker").classList.remove("hidden");
+      } else if (mode === "year") {
+        document.querySelector(".year-picker").classList.remove("hidden");
+      } else {
+          document.querySelector(".decade-picker").classList.remove("hidden");
+        }
+        pillLabelEl.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+      }
+
+      function togglePlayback() {
+        if (state.isPlaying) {
+          stopPlayback();
+        } else {
+          startPlayback();
+        }
+      }
+
+      function startPlayback() {
+        const seq = getCurrentSequence();
+        if (!seq.length) return;
+        stopPlayback();
+        state.isPlaying = true;
+        playBtn.textContent = "⏸ Pause";
+        state.timerId = setInterval(stepPlayback, PLAY_INTERVAL);
+        stepPlayback();
+      }
+
+      function stopPlayback() {
+        if (state.timerId) {
+          clearInterval(state.timerId);
+          state.timerId = null;
+        }
+        state.isPlaying = false;
+        playBtn.textContent = "▶ Play";
+      }
+
+      function getCurrentSequence() {
+        if (state.mode === "song") return state.songOrder || [];
+        if (state.mode === "year") return state.yearOrder || [];
+        return state.decadeOrder || [];
+      }
+
+      function stepPlayback() {
+        const seq = getCurrentSequence();
+        if (!seq.length) {
+          stopPlayback();
+          return;
+        }
+
+        if (state.mode === "song") {
+          const idx = seq.findIndex((d) => d.track_id === state.selectedSong);
+          const nextIndex = idx === -1 ? 0 : (idx + 1) % seq.length;
+          const next = seq[nextIndex];
+          state.selectedSong = next.track_id;
+          songSelect.value = next.track_id;
+        } else if (state.mode === "year") {
+          const idx = seq.findIndex((y) => y === state.selectedYear);
+          const nextIndex = idx === -1 ? 0 : (idx + 1) % seq.length;
+          const next = seq[nextIndex];
+          state.selectedYear = next;
+          yearSelect.value = next;
+        } else {
+          const idx = seq.findIndex((d) => d === state.selectedDecade);
+          const nextIndex = idx === -1 ? 0 : (idx + 1) % seq.length;
+          const next = seq[nextIndex];
+          state.selectedDecade = next;
+          decadeSelect.value = next;
+        }
+
+        updateView();
+      }
+
+      function updateView() {
+        const selection = buildSelection();
+        if (!selection) {
+          statusEl.textContent = "No data for this choice.";
+          chartSubtitleEl.textContent = "";
+        chartTitleEl.textContent = "Emotion profile";
+        selectionInfoEl.textContent = "";
+        statCountEl.textContent = "—";
+        statTopEl.textContent = "—";
+        renderRadar(zeroValues);
+        renderBars(zeroValues);
+        return;
+      }
+
+      statusEl.textContent = "";
+      chartTitleEl.textContent = selection.title;
+      chartSubtitleEl.textContent = selection.subtitle;
+      selectionInfoEl.innerHTML = selection.description;
+      statCountEl.textContent = selection.count;
+      statTopEl.textContent = selection.topEmotion
+        ? `${formatLabel(selection.topEmotion.key)} (${selection.topEmotion.value.toFixed(2)})`
+        : "—";
+
+      renderRadar(selection.values);
+      renderBars(selection.values);
+    }
+
+    function buildSelection() {
+      if (state.mode === "song") {
+        const song = state.songMap.get(state.selectedSong);
+        if (!song) return null;
+        return makeSelection([song], {
+          title: `${song.title}`,
+          subtitle: `${song.artist_name} · ${song.year ?? "Unknown year"}`,
+          label: "Song",
+        });
+      }
+
+      if (state.mode === "year") {
+        const songs = state.songsByYear.get(state.selectedYear) || [];
+        return makeSelection(songs, {
+          title: `Year ${state.selectedYear}`,
+          //subtitle: `${songs.length} songs with emotion scores`,
+          label: "Year",
+        });
+      }
+
+      const songs = state.songsByDecade.get(state.selectedDecade) || [];
+      const decadeLabel =
+        state.selectedDecade != null ? `${state.selectedDecade}s` : "Unknown decade";
+      return makeSelection(songs, {
+        title: decadeLabel,
+        //subtitle: `${songs.length} songs with emotion scores`,
+        label: "Decade",
+      });
+    }
+
+    function makeSelection(songs, meta) {
+      if (!songs.length) return null;
+      const values = {};
+      emotionKeys.forEach((k) => {
+        values[k] = d3.mean(songs, (d) => clampValue(d[k]));
+      });
+
+      const emotionEntries = emotionKeys.map((k) => ({
+        key: k,
+        value: values[k],
+      }));
+      const topEmotion = emotionEntries.reduce((best, cur) => {
+        if (!best || cur.value > best.value) return cur;
+        return best;
+      }, null);
+
+      const description = [
+        `<strong>${meta.title}</strong>`,
+        meta.subtitle || "",
+        songs.length > 1 ? "Average emotion scores across selected songs." : "Single-song emotion scores.",
+      ]
+        .filter(Boolean)
+        .join("<br/>");
+
+      return {
+        values,
+        count: songs.length,
+        title: meta.title,
+        subtitle: meta.subtitle || "",
+        description,
+        topEmotion,
+      };
+    }
+
+    function clampValue(v) {
+      const num = Number(v);
+      if (!Number.isFinite(num)) return 0;
+      return Math.max(0, Math.min(maxValue, num));
+    }
+
+    function renderRadar(values) {
+      const dataPoints = emotionKeys.map((key, i) => ({
+        key,
+        value: clampValue(values[key]),
+        angle: angleSlice * i,
+      }));
+
+      const withZero = dataPoints.map((d) => ({ ...d, value: 0 }));
+
+      const area = areaLayer
+        .selectAll("path.radar-area")
+        .data([dataPoints]);
+
+      area
+        .enter()
+        .append("path")
+        .attr("class", "radar-area")
+        .attr("fill", "rgba(34, 211, 238, 0.2)")
+        .attr("stroke", "rgba(34, 211, 238, 0.9)")
+        .attr("stroke-width", 2.2)
+        .attr("d", radarLine(withZero))
+        .transition()
+        .duration(800)
+        .ease(d3.easeCubicInOut)
+        .attr("d", radarLine(dataPoints));
+
+      area
+        .transition()
+        .duration(800)
+        .ease(d3.easeCubicInOut)
+        .attr("d", radarLine(dataPoints));
+
+      const dots = dotsLayer
+        .selectAll("circle.radar-dot")
+        .data(dataPoints, (d) => d.key);
+
+      dots
+        .enter()
+        .append("circle")
+        .attr("class", "radar-dot")
+        .attr("fill", (d) => emotionColors[d.key] || "#22d3ee")
+        .attr("stroke", "#0b1020")
+        .attr("stroke-width", 1.5)
+        .attr("r", 0)
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .transition()
+        .duration(800)
+        .ease(d3.easeCubicInOut)
+        .attr("r", 5)
+        .attr("cx", (d) => rScale(d.value) * Math.sin(d.angle))
+        .attr("cy", (d) => -rScale(d.value) * Math.cos(d.angle));
+
+      dots
+        .transition()
+        .duration(800)
+        .ease(d3.easeCubicInOut)
+        .attr("r", 5)
+        .attr("cx", (d) => rScale(d.value) * Math.sin(d.angle))
+        .attr("cy", (d) => -rScale(d.value) * Math.cos(d.angle));
+    }
+
+    function renderBars(values) {
+      emotionKeys.forEach((key) => {
+        const val = clampValue(values[key]);
+        let entry = barCache.get(key);
+
+        if (!entry) {
+          const row = document.createElement("div");
+          row.className = "bar";
+          const header = document.createElement("div");
+          header.className = "bar-header";
+          const label = document.createElement("span");
+          label.textContent = formatLabel(key);
+          const valueEl = document.createElement("span");
+          header.appendChild(label);
+          header.appendChild(valueEl);
+
+          const barFill = document.createElement("div");
+          barFill.className = "bar-fill";
+          const span = document.createElement("span");
+          barFill.appendChild(span);
+
+          row.appendChild(header);
+          row.appendChild(barFill);
+          barsEl.appendChild(row);
+
+          entry = { valueEl, span };
+          barCache.set(key, entry);
+        }
+
+        entry.valueEl.textContent = val.toFixed(2);
+        entry.span.style.width = `${val * 100}%`;
+        entry.span.style.background = emotionColors[key] || "#22d3ee";
+      });
+    }
+
+    function formatLabel(key) {
+      return key.charAt(0).toUpperCase() + key.slice(1);
+    }
+  </script>
+</body>
