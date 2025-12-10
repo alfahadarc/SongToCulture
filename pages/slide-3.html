@@ -1,0 +1,111 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Million Song Dataset</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0;
+    font-family: "Inter", -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(circle at 20% 20%, #1a2550 0%, #0e142a 45%, #080b17 100%);
+    color: #e9edf5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 26px 22px 38px; }
+  .card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  }
+  .eyebrow { text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px; color: #99a5c8; margin-bottom: 6px; }
+  h1 { margin: 0 0 6px; font-size: 28px; }
+  .lede { margin: 0 0 18px; color: #cdd5e7; line-height: 1.6; max-width: 900px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+  .section {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+  .section h2 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #a7b3ce;
+  }
+  .bullets { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .bullets li { position: relative; padding-left: 16px; line-height: 1.5; }
+  .bullets li::before { content: "•"; position: absolute; left: 0; color: #79d8ff; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 0; }
+  .pill {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #e9edf5;
+    white-space: nowrap;
+  }
+  .note { color: #b8c3dc; margin-top: 8px; font-size: 13px; line-height: 1.5; }
+  .callout {
+    border: 1px solid rgba(121, 216, 255, 0.5);
+    background: linear-gradient(135deg, rgba(121, 216, 255, 0.15), rgba(255, 255, 255, 0));
+  }
+  @media (max-width: 920px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+<body>
+  <div class="eyebrow">Dataset profile</div>
+  <h1>Million Song Dataset (MSD)</h1>
+  <p class="lede">
+    One million tracks of mostly Western popular music with high-level audio descriptors, song metadata, and artist similarity links—built as a benchmark for large-scale music information retrieval.
+  </p>
+
+  <div class="grid">
+    <div class="section">
+      <h2>Scope & Coverage</h2>
+      <ul class="bullets">
+        <li>1M tracks spanning multiple decades of popular music with artist and album context.</li>
+        <li>High-level audio features such as key, mode, and energy plus song “hotness” scores.</li>
+        <li>Artist-centric signals: location, familiarity, and lists of similar artists for recommendation work.</li>
+      </ul>
+    </div>
+
+    <div class="section callout">
+      <h2>Used for </h2>
+      <ul class="bullets">
+        <li>Trend studies of keys, modes, and energetic profile changes across years.</li>
+        <li>Prototyping recommendation or similarity graphs with the built-in artist links.</li>
+        <li>Multimodal analyses when paired with lyrics (MXM), tags (Last.fm), or symbolic MIDI (Lakh).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top: 14px;">
+    <div class="section">
+      <h2>Attributes</h2>
+      <div class="pills">
+        <span class="pill">song_title</span>
+        <span class="pill">artist_name</span>
+        <span class="pill">year</span>
+        <span class="pill">album</span>
+        <span class="pill">key</span>
+        <span class="pill">mode</span>
+        <span class="pill">energy</span>
+        <span class="pill">song_hotness</span>
+        <span class="pill">artist_location</span>
+        <span class="pill">artist_familiarity</span>
+        <span class="pill">similar_artists</span>
+      </div>
+      <p class="note">
+        <ul>
+          <li>key: Musical key of the track, represented as an integer (0=C, 1=C#/Db, etc.).</li>
+          <li>mode: Binary flag indicating major (1) or minor (0) tonality.</li>
+          <li>energy: Perceptual measure of intensity and activity (0.0 to 1.0 scale).</li>
+        </ul>
+      </p>
+    </div>
+  </div>
+</body>
