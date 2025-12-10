@@ -46,10 +46,10 @@
 
       #ui h1 {
         margin: 0 0 6px;
-        font-size: 18px;
+        font-size: 28px;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: var(--muted);
+        color: white;
       }
 
       #ui p {
@@ -63,6 +63,10 @@
         flex-wrap: wrap;
         gap: 6px;
         margin-bottom: 8px;
+        flex-direction: column;
+        align-content: flex-start;
+        justify-content: center;
+        align-items: flex-start;
       }
 
       .decade-toggle {
@@ -74,6 +78,7 @@
         border-radius: 999px;
         border: 1px solid rgba(148, 163, 184, 0.4);
         background: rgba(15, 23, 42, 0.9);
+        color: var(--text);
         cursor: pointer;
         transition: all 0.18s ease-out;
       }
@@ -135,11 +140,10 @@
     <div id="ui">
       <h1>Tempo–Key Galaxy</h1>
       <p>
-        Each glow is a tempo–key cluster. Colors = decades. Radius = density.
+        Each glow is a tempo–key cluster. <br> Colors = decades. <br>Radius = density.
       </p>
       <div class="decade-toggle-group" id="decade-toggles"></div>
       <div id="legend">
-        <span class="badge">Fill: decade</span>
         <span class="badge">Glow: major / minor mix</span>
       </div>
     </div>
@@ -235,7 +239,7 @@
           ]);
 
         // which decades are on
-        let activeDecades = new Set(allDecades);
+        let activeDecades = new Set();
 
         function getActiveDecades() {
           // if somehow all are off, fall back to allDecades
@@ -555,7 +559,7 @@
             .data(allDecades)
             .enter()
             .append("button")
-            .attr("class", "decade-toggle active")
+            .attr("class", "decade-toggle")
             .attr("data-decade", (d) => d)
             .html(
               (d) => `

@@ -1,704 +1,698 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Fame vs Fire – Artist Familiarity vs Song Hotness</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
-    <style>
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
-        background: #020617; /* dark */
-        color: #e5e7eb;
-      }
+<meta charset="UTF-8" />
+<title>Fame vs Fire – Artist Familiarity vs Song Hotness</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
+<style>
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      sans-serif;
+    background: #020617; /* dark */
+    color: #e5e7eb;
+  }
 
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 16px 24px 32px;
-      }
+  .container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 16px 24px 32px;
+  }
 
-      h1 {
-        margin: 0 0 4px;
-        font-size: 24px;
-        font-weight: 600;
-      }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 24px;
+    font-weight: 600;
+  }
 
-      .subtitle {
-        font-size: 13px;
-        color: #9ca3af;
-        margin-bottom: 16px;
-      }
+  .subtitle {
+    font-size: 13px;
+    color: #9ca3af;
+    margin-bottom: 16px;
+  }
 
-      .badge-muted {
-        font-size: 10px;
-        padding: 2px 6px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid #1f2937;
-        color: #9ca3af;
-      }
+  .badge-muted {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid #1f2937;
+    color: #9ca3af;
+  }
 
-      #controls {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
-        font-size: 13px;
-      }
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
 
-      #year-slider {
-        width: 200px;
-        accent-color: #38bdf8;
-      }
+  #year-slider {
+    width: 200px;
+    accent-color: #38bdf8;
+  }
 
-      #year-label {
-        font-size: 13px;
-        color: #e5e7eb;
-      }
+  #year-label {
+    font-size: 13px;
+    color: #e5e7eb;
+  }
 
-      #chart-wrapper {
-        background: #020617;
-        border-radius: 16px;
-        border: 1px solid #1f2937;
-        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.6);
-        padding: 12px;
-        position: relative;
-        overflow: hidden;
-      }
+  #chart-wrapper {
+    background: #020617;
+    border-radius: 16px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.6);
+    padding: 12px;
+    position: relative;
+    overflow: hidden;
+  }
 
-      svg.chart-svg {
-        background: #020617;
-        width: 100%;
-        height: 620px;
-        display: block;
-      }
+  svg.chart-svg {
+    background: #020617;
+    width: 100%;
+    height: 620px;
+    display: block;
+  }
 
-      .axis path,
-      .axis line {
-        stroke: #4b5563;
-      }
+  .axis path,
+  .axis line {
+    stroke: #4b5563;
+  }
 
-      .axis text {
-        fill: #9ca3af;
-        font-size: 11px;
-      }
+  .axis text {
+    fill: #9ca3af;
+    font-size: 11px;
+  }
 
-      .axis-label {
-        fill: #9ca3af;
-        font-size: 11px;
-      }
+  .axis-label {
+    fill: #9ca3af;
+    font-size: 11px;
+  }
 
-      .hexbin path {
-        stroke: none;
-      }
+  .hexbin path {
+    stroke: none;
+  }
 
-      .highlight-point {
-        fill: none;
-        stroke-width: 1.6px;
-        cursor: pointer;
-      }
+  .highlight-point {
+    fill: none;
+    stroke-width: 1.6px;
+    cursor: pointer;
+  }
 
-      .highlight-glow {
-        fill: none;
-        stroke-width: 3px; /* thinner */
-        opacity: 0.08; /* much lighter */
-        stroke: #0f172a; /* darker, closer to bg */
-        pointer-events: none;
-      }
+  .highlight-glow {
+    fill: none;
+    stroke-width: 3px; /* thinner */
+    opacity: 0.08; /* much lighter */
+    stroke: #0f172a; /* darker, closer to bg */
+    pointer-events: none;
+  }
 
-      #tooltip {
-        position: absolute;
-        pointer-events: none;
-        background: rgba(15, 23, 42, 0.95);
-        color: #f9fafb;
-        padding: 8px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        line-height: 1.4;
-        border: 1px solid #1f2937;
-        opacity: 0;
-        transition: opacity 0.12s ease-out, transform 0.12s ease-out;
-        transform: translateY(4px);
-        max-width: 260px;
-        z-index: 10;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
-        white-space: normal;
-      }
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.95);
+    color: #f9fafb;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    border: 1px solid #1f2937;
+    opacity: 0;
+    transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+    transform: translateY(4px);
+    max-width: 260px;
+    z-index: 10;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
+    white-space: normal;
+  }
 
-      #tooltip .title {
-        font-weight: 600;
-        margin-bottom: 2px;
-      }
+  #tooltip .title {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
 
-      #tooltip .meta {
-        color: #9ca3af;
-        margin-bottom: 4px;
-      }
+  #tooltip .meta {
+    color: #9ca3af;
+    margin-bottom: 4px;
+  }
 
-      #tooltip .metrics span {
-        display: inline-block;
-        margin-right: 6px;
-      }
+  #tooltip .metrics span {
+    display: inline-block;
+    margin-right: 6px;
+  }
 
-      .legend {
-        font-size: 11px;
-      }
+  .legend {
+    font-size: 11px;
+  }
 
-      .legend-section-title {
-        fill: #9ca3af;
-        font-size: 11px;
-        font-weight: 500;
-      }
+  .legend-section-title {
+    fill: #9ca3af;
+    font-size: 11px;
+    font-weight: 500;
+  }
 
-      .zoom-hint {
-        position: absolute;
-        right: 14px;
-        bottom: 10px;
-        font-size: 10px;
-        color: #6b7280;
-        background: rgba(2, 6, 23, 0.7);
-        padding: 3px 6px;
-        border-radius: 999px;
-        border: 1px solid #111827;
-        backdrop-filter: blur(6px);
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Fame vs Fire</h1>
-      <div class="subtitle">
-        <span class="badge-muted">Artist familiarity vs song hotttnesss</span>
-        &nbsp;Hexbin shows density. Use the year slider to see one year at a
-        time; top hot tracks are marked with white rings.
-      </div>
-
-      <div id="controls">
-        <span id="year-label">Year: <strong>All years</strong></span>
-        <input
-          id="year-slider"
-          type="range"
-          min="0"
-          max="1"
-          step="1"
-          value="1"
-        />
-        <span style="font-size: 11px; color: #6b7280">
-          Drag to filter by year (last step = all years).
-        </span>
-      </div>
-
-      <div id="chart-wrapper">
-        <div id="chart"></div>
-        <div id="tooltip"></div>
-        <div class="zoom-hint">Scroll to zoom · drag to pan</div>
-      </div>
+  .zoom-hint {
+    position: absolute;
+    right: 14px;
+    bottom: 10px;
+    font-size: 10px;
+    color: #6b7280;
+    background: rgba(2, 6, 23, 0.7);
+    padding: 3px 6px;
+    border-radius: 999px;
+    border: 1px solid #111827;
+    backdrop-filter: blur(6px);
+  }
+</style>
+<body>
+  <div class="container">
+    <h1>Fame vs Fire</h1>
+    <div class="subtitle">
+      <span class="badge-muted">Artist familiarity vs song hotttnesss</span>
+      &nbsp;Hexbin shows density. Use the year slider to see one year at a
+      time; top hot tracks are marked with white rings.
     </div>
 
-    <script>
-      const csvPath = "./Data/songs.csv"; // change if needed
-
-      const margin = { top: 24, right: 210, bottom: 55, left: 60 };
-      const width = 1100;
-      const height = 580;
-      const chartWidth = width - margin.left - margin.right;
-      const chartHeight = height - margin.top - margin.bottom;
-
-      const svg = d3
-        .select("#chart")
-        .append("svg")
-        .attr("class", "chart-svg")
-        .attr("viewBox", `0 0 ${width} ${height}`);
-
-      const chartArea = svg
-        .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
-
-      // optional background rect inside the axes
-      chartArea
-        .append("rect")
-        .attr("class", "plot-bg")
-        .attr("width", chartWidth)
-        .attr("height", chartHeight)
-        .attr("fill", "#020617");
-
-      chartArea
-        .append("defs")
-        .append("clipPath")
-        .attr("id", "clip-fame")
-        .append("rect")
-        .attr("width", chartWidth)
-        .attr("height", chartHeight);
-
-      const hexLayer = chartArea
-        .append("g")
-        .attr("class", "hexbin")
-        .attr("clip-path", "url(#clip-fame)");
-
-      const pointsLayer = chartArea
-        .append("g")
-        .attr("class", "points-layer")
-        .attr("clip-path", "url(#clip-fame)");
-
-      const overlayLayer = pointsLayer
-        .append("g")
-        .attr("class", "top-overlay-layer");
-
-      const xAxisGroup = chartArea
-        .append("g")
-        .attr("class", "axis x-axis")
-        .attr("transform", `translate(0,${chartHeight})`);
-
-      const yAxisGroup = chartArea.append("g").attr("class", "axis y-axis");
-
-      chartArea
-        .append("text")
-        .attr("class", "axis-label")
-        .attr("x", chartWidth / 2)
-        .attr("y", chartHeight + 40)
-        .attr("text-anchor", "middle")
-        .text("Artist familiarity");
-
-      chartArea
-        .append("text")
-        .attr("class", "axis-label")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -chartHeight / 2)
-        .attr("y", -42)
-        .attr("text-anchor", "middle")
-        .text("Song hotttnesss");
-
-      const tooltip = d3.select("#tooltip");
-      const wrapper = document.getElementById("chart-wrapper");
-
-      const yearSlider = d3.select("#year-slider");
-      const yearLabel = d3.select("#year-label");
-
-      d3.csv(csvPath, d3.autoType)
-        .then((rawData) => {
-          let data = rawData.filter(
-            (d) =>
-              d.artist_familiarity != null &&
-              d.song_hotttnesss != null &&
-              !isNaN(d.artist_familiarity) &&
-              !isNaN(d.song_hotttnesss)
-          );
-
-          data.forEach((d) => {
-            d.artist_familiarity = +d.artist_familiarity;
-            d.song_hotttnesss = +d.song_hotttnesss;
-            d.duration = d.duration != null ? +d.duration : null;
-            d.year = d.year != null ? +d.year : null;
-          });
-
-          if (!data.length) {
-            d3.select("#chart")
-              .append("div")
-              .style("color", "#f87171")
-              .style("font-size", "13px")
-              .style("padding", "12px")
-              .text(
-                "No valid artist_familiarity and song_hotttnesss data found."
-              );
-            return;
-          }
-
-          // Unique years (for slider)
-          let years = Array.from(new Set(data.map((d) => d.year)))
-            .filter((d) => d != null)
-            .sort(d3.ascending);
-
-          const allIndex = years.length; // last index = "All years"
-
-          yearSlider
-            .attr("min", 0)
-            .attr("max", allIndex)
-            .attr("step", 1)
-            .attr("value", allIndex);
-
-          function formatYearIndex(idx) {
-            if (idx >= allIndex) return "All years";
-            return years[idx];
-          }
-
-          function getFilteredData(idx) {
-            if (idx >= allIndex) return data;
-            const yearVal = years[idx];
-            return data.filter((d) => d.year === yearVal);
-          }
-
-          yearLabel.html(`Year: <strong>${formatYearIndex(allIndex)}</strong>`);
-
-          // === SCALES (fixed based on all data) ===
-          const xExtent = d3.extent(data, (d) => d.artist_familiarity);
-          const yExtent = d3.extent(data, (d) => d.song_hotttnesss);
-
-          const xPad = (xExtent[1] - xExtent[0]) * 0.05 || 0.02;
-          const yPad = (yExtent[1] - yExtent[0]) * 0.05 || 0.02;
-
-          const xScale = d3
-            .scaleLinear()
-            .domain([xExtent[0] - xPad, xExtent[1] + xPad])
-            .range([0, chartWidth]);
-
-          const yScale = d3
-            .scaleLinear()
-            .domain([yExtent[0] - yPad, yExtent[1] + yPad])
-            .range([chartHeight, 0]);
-
-          const xAxis = d3.axisBottom(xScale).ticks(6).tickSizeOuter(0);
-
-          const yAxis = d3.axisLeft(yScale).ticks(6).tickSizeOuter(0);
-
-          xAxisGroup.call(xAxis);
-          yAxisGroup.call(yAxis);
-
-          // Hexbin setup with global extent
-          // === HEXBIN ===
-          const hexbin = d3
-            .hexbin()
-            .x((d) => xScale(d.artist_familiarity))
-            .y((d) => yScale(d.song_hotttnesss))
-            .radius(14)
-            .extent([
-              [0, 0],
-              [chartWidth, chartHeight],
-            ]);
-
-          // --- Density scale: declared once, updated per year in render() ---
-          let maxBinSize = 1; // will be updated in render()
-          const colorDensity = d3
-            .scaleSequential()
-            .domain([0, maxBinSize])
-            .interpolator((t) => d3.interpolateCool(0.3 + 0.7 * t));
-
-          // === LEGEND (for density only) ===
-          const legend = svg
-            .append("g")
-            .attr("class", "legend")
-            .attr(
-              "transform",
-              `translate(${width - margin.right + 18}, ${margin.top})`
-            );
-
-          legend
-            .append("text")
-            .attr("class", "legend-section-title")
-            .attr("x", 0)
-            .attr("y", 0)
-            .text("Density");
-
-          const gradId = "density-gradient";
-          const defs = svg.append("defs");
-          const gradient = defs
-            .append("linearGradient")
-            .attr("id", gradId)
-            .attr("x1", "0%")
-            .attr("x2", "100%")
-            .attr("y1", "0%")
-            .attr("y2", "0%");
-
-          const stops = d3.range(0, 1.01, 0.2);
-          stops.forEach((s) => {
-            gradient
-              .append("stop")
-              .attr("offset", s * 100 + "%")
-              .attr("stop-color", colorDensity(s * maxBinSize));
-          });
-
-          legend
-            .append("rect")
-            .attr("x", 0)
-            .attr("y", 6)
-            .attr("width", 110)
-            .attr("height", 10)
-            .attr("fill", `url(#${gradId})`);
-
-          legend
-            .append("text")
-            .attr("x", 0)
-            .attr("y", 25)
-            .attr("fill", "#9ca3af")
-            .attr("font-size", 10)
-            .text("Low");
-
-          legend
-            .append("text")
-            .attr("x", 110)
-            .attr("y", 25)
-            .attr("fill", "#9ca3af")
-            .attr("font-size", 10)
-            .attr("text-anchor", "end")
-            .text("High");
-
-          // === RENDER FUNCTION ===
-          function render(filtered) {
-            const bins = hexbin(filtered);
-
-            // Recompute max density for THIS year / subset
-            maxBinSize = d3.max(bins, (b) => b.length) || 1;
-
-            // Update the color scale domain to this year's range
-            colorDensity.domain([0, maxBinSize]);
-
-            const hexPaths = hexLayer
-              .selectAll("path")
-              .data(bins, (d) => `${d.x},${d.y}`);
-
-            hexPaths.exit().remove();
-
-            const hexEnter = hexPaths
-              .enter()
-              .append("path")
-              .attr("d", hexbin.hexagon());
-
-            hexEnter
-              .merge(hexPaths)
-              .attr("transform", (d) => `translate(${d.x},${d.y})`)
-              .style("fill", (d) => colorDensity(d.length))
-              .style("opacity", (d) => 0.2 + 0.8 * (d.length / maxBinSize))
-              .on("mouseover", (event, bin) => {
-                const [mx, my] = d3.pointer(event, wrapper);
-                const count = bin.length;
-
-                // --- POP EFFECT: scale + stroke on hover ---
-                d3.select(event.currentTarget)
-                  .raise() // bring this hex on top of others
-                  .transition()
-                  .duration(120)
-                  .attr(
-                    "transform",
-                    (d) => `translate(${d.x},${d.y}) scale(1.25)`
-                  )
-                  .style("stroke", "#f9fafb")
-                  .style("stroke-width", 1.2);
-
-                // bin is an array of original data points in this hex
-                const top5 = bin
-                  .slice()
-                  .sort((a, b) => b.song_hotttnesss - a.song_hotttnesss)
-                  .slice(0, 5);
-
-                const rowsHtml = top5
-                  .map((d, i) => {
-                    const hot =
-                      d.song_hotttnesss != null && !isNaN(d.song_hotttnesss)
-                        ? d.song_hotttnesss.toFixed(3)
-                        : "n/a";
-
-                    const fam =
-                      d.artist_familiarity != null &&
-                      !isNaN(d.artist_familiarity)
-                        ? d.artist_familiarity.toFixed(3)
-                        : "n/a";
-
-                    return `<div>#${
-                      i + 1
-                    }: (song_hot=${hot}, artist_fam=${fam})</div>`;
-                  })
-                  .join("");
-
-                tooltip
-                  .style("left", mx + 6 + "px")
-                  .style("top", my - 6 + "px")
-                  .style("opacity", 1)
-                  .style("transform", "translateY(0px)").html(`
-                <div class="title">Bin summary</div>
-                <div class="metrics">
-                  <div>Songs in this region: <strong>${count}</strong></div>
-                  <div style="margin-top:4px; font-size:10px; color:#9ca3af;">Top by song_hotttnesss:</div>
-                  <div style="font-size:10px;">${rowsHtml}</div>
-                </div>
-              `);
-              })
-              .on("mousemove", (event) => {
-                const [mx, my] = d3.pointer(event, wrapper);
-                tooltip
-                  .style("left", mx + 6 + "px")
-                  .style("top", my - 6 + "px");
-              })
-              .on("mouseout", () => {
-                // --- RETURN TO NORMAL ---
-                d3.select(event.currentTarget)
-                  .transition()
-                  .duration(120)
-                  .attr("transform", (d) => `translate(${d.x},${d.y}) scale(1)`)
-                  .style("stroke", "none");
-                tooltip
-                  .style("opacity", 0)
-                  .style("transform", "translateY(4px)");
-              });
-
-            // OVERLAY TOP HOT SONGS (WHITE RINGS)
-            overlayLayer.selectAll("*").remove();
-
-            if (!filtered.length) return;
-
-            const sortedByHot = filtered
-              .slice()
-              .sort((a, b) => b.song_hotttnesss - a.song_hotttnesss);
-            let topCount = Math.floor(filtered.length * 0.005); // top 0.5%
-            topCount = Math.max(5, Math.min(topCount, 100));
-            const topHotSongs = sortedByHot.slice(0, topCount);
-
-            const durationExtent = d3.extent(
-              topHotSongs,
-              (d) => d.duration || 0
-            );
-            const radiusScale = d3
-              .scaleSqrt()
-              .domain(
-                durationExtent[0] === durationExtent[1]
-                  ? [0, durationExtent[1] || 1]
-                  : durationExtent
-              )
-              .range([5, 14]);
-
-            const overlay = overlayLayer
-              .selectAll("g.overlay-song")
-              .data(topHotSongs, (d) => d.track_id || d.song_id || d.title);
-
-            const overlayEnter = overlay
-              .enter()
-              .append("g")
-              .attr("class", "overlay-song")
-              .attr(
-                "transform",
-                (d) =>
-                  `translate(${xScale(d.artist_familiarity)},${yScale(
-                    d.song_hotttnesss
-                  )})`
-              );
-
-            // Glow
-            overlayEnter
-              .append("circle")
-              .attr("class", "highlight-glow")
-              .attr("r", 0)
-              .attr("stroke", "#22d3ee")
-              .transition()
-              .duration(350)
-              .attr(
-                "r",
-                (d) => radiusScale(d.duration || durationExtent[1] || 1) * 1.6
-              );
-
-            // Main ring
-            overlayEnter
-              .append("circle")
-              .attr("class", "highlight-point")
-              .attr("r", 0)
-              .attr("stroke", "#e5e7eb")
-              .style("opacity", 0.95)
-              .transition()
-              .duration(350)
-              .attr("r", (d) =>
-                radiusScale(d.duration || durationExtent[1] || 1)
-              );
-
-            // Tooltip on overlay group
-            overlayEnter
-              .on("mouseover", (event, d) => {
-                const [mx, my] = d3.pointer(event, wrapper);
-
-                const title = d.title || "(Untitled)";
-                const artist = d.artist_name || d.artist || "Unknown artist";
-
-                const hot =
-                  d.song_hotttnesss != null && !isNaN(d.song_hotttnesss)
-                    ? d.song_hotttnesss.toFixed(3)
-                    : "n/a";
-
-                const fam =
-                  d.artist_familiarity != null && !isNaN(d.artist_familiarity)
-                    ? d.artist_familiarity.toFixed(3)
-                    : "n/a";
-
-                const dur =
-                  d.duration != null && !isNaN(d.duration)
-                    ? (d.duration / 60).toFixed(1) + " min"
-                    : "n/a";
-
-                tooltip
-                  .style("left", mx + 1 + "px")
-                  .style("top", my - 1 + "px")
-                  .style("opacity", 1)
-                  .style("transform", "translateY(0px)").html(`
-                <div class="title">${title}</div>
-                <div class="meta">${artist} · ${d.year || "Year n/a"}</div>
-                <div class="metrics">
-                  <span>Artist familiarity: <strong>${fam}</strong></span><br/>
-                  <span>Hotttnesss: <strong>${hot}</strong></span><br/>
-                  <span>Duration: <strong>${dur}</strong></span>
-                </div>
-              `);
-              })
-              .on("mousemove", (event) => {
-                const [mx, my] = d3.pointer(event, wrapper);
-                tooltip
-                  .style("left", mx + 1 + "px")
-                  .style("top", my - 1 + "px");
-              })
-              .on("mouseout", () => {
-                tooltip
-                  .style("opacity", 0)
-                  .style("transform", "translateY(4px)");
-              });
-          }
-
-          // Initial render with all data
-          render(data);
-
-          // Year slider interaction
-          yearSlider.on("input", (event) => {
-            const idx = +event.target.value;
-            const label = formatYearIndex(idx);
-            yearLabel.html(`Year: <strong>${label}</strong>`);
-            const filtered = getFilteredData(idx);
-            render(filtered);
-          });
-
-          // Zoom & pan
-          const zoom = d3
-            .zoom()
-            .scaleExtent([0.7, 15])
-            .translateExtent([
-              [0, 0],
-              [width, height],
-            ])
-            .extent([
-              [0, 0],
-              [width, height],
-            ])
-            .on("zoom", (event) => {
-              const transform = event.transform;
-              const zx = transform.rescaleX(xScale);
-              const zy = transform.rescaleY(yScale);
-
-              hexLayer.attr("transform", transform);
-              pointsLayer.attr("transform", transform);
-
-              xAxisGroup.call(d3.axisBottom(zx).ticks(6).tickSizeOuter(0));
-              yAxisGroup.call(d3.axisLeft(zy).ticks(6).tickSizeOuter(0));
-            });
-
-          svg.call(zoom);
-        })
-        .catch((err) => {
-          console.error("Error loading CSV:", err);
+    <div id="controls">
+      <span id="year-label">Year: <strong>All years</strong></span>
+      <input
+        id="year-slider"
+        type="range"
+        min="0"
+        max="1"
+        step="1"
+        value="1"
+      />
+      <span style="font-size: 11px; color: #6b7280">
+        Drag to filter by year (last step = all years).
+      </span>
+    </div>
+
+    <div id="chart-wrapper">
+      <div id="chart"></div>
+      <div id="tooltip"></div>
+      <div class="zoom-hint">Scroll to zoom · drag to pan</div>
+    </div>
+  </div>
+
+  <script>
+    const csvPath = "./Data/songs.csv"; // change if needed
+
+    const margin = { top: 24, right: 210, bottom: 55, left: 60 };
+    const width = 1100;
+    const height = 580;
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+
+    const svg = d3
+      .select("#chart")
+      .append("svg")
+      .attr("class", "chart-svg")
+      .attr("viewBox", `0 0 ${width} ${height}`);
+
+    const chartArea = svg
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // optional background rect inside the axes
+    chartArea
+      .append("rect")
+      .attr("class", "plot-bg")
+      .attr("width", chartWidth)
+      .attr("height", chartHeight)
+      .attr("fill", "#020617");
+
+    chartArea
+      .append("defs")
+      .append("clipPath")
+      .attr("id", "clip-fame")
+      .append("rect")
+      .attr("width", chartWidth)
+      .attr("height", chartHeight);
+
+    const hexLayer = chartArea
+      .append("g")
+      .attr("class", "hexbin")
+      .attr("clip-path", "url(#clip-fame)");
+
+    const pointsLayer = chartArea
+      .append("g")
+      .attr("class", "points-layer")
+      .attr("clip-path", "url(#clip-fame)");
+
+    const overlayLayer = pointsLayer
+      .append("g")
+      .attr("class", "top-overlay-layer");
+
+    const xAxisGroup = chartArea
+      .append("g")
+      .attr("class", "axis x-axis")
+      .attr("transform", `translate(0,${chartHeight})`);
+
+    const yAxisGroup = chartArea.append("g").attr("class", "axis y-axis");
+
+    chartArea
+      .append("text")
+      .attr("class", "axis-label")
+      .attr("x", chartWidth / 2)
+      .attr("y", chartHeight + 40)
+      .attr("text-anchor", "middle")
+      .text("Artist familiarity");
+
+    chartArea
+      .append("text")
+      .attr("class", "axis-label")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -chartHeight / 2)
+      .attr("y", -42)
+      .attr("text-anchor", "middle")
+      .text("Song hotttnesss");
+
+    const tooltip = d3.select("#tooltip");
+    const wrapper = document.getElementById("chart-wrapper");
+
+    const yearSlider = d3.select("#year-slider");
+    const yearLabel = d3.select("#year-label");
+
+    d3.csv(csvPath, d3.autoType)
+      .then((rawData) => {
+        let data = rawData.filter(
+          (d) =>
+            d.artist_familiarity != null &&
+            d.song_hotttnesss != null &&
+            !isNaN(d.artist_familiarity) &&
+            !isNaN(d.song_hotttnesss)
+        );
+
+        data.forEach((d) => {
+          d.artist_familiarity = +d.artist_familiarity;
+          d.song_hotttnesss = +d.song_hotttnesss;
+          d.duration = d.duration != null ? +d.duration : null;
+          d.year = d.year != null ? +d.year : null;
+        });
+
+        if (!data.length) {
           d3.select("#chart")
             .append("div")
             .style("color", "#f87171")
             .style("font-size", "13px")
             .style("padding", "12px")
             .text(
-              "Failed to load songs.csv. Check the file path/name and refresh."
+              "No valid artist_familiarity and song_hotttnesss data found."
             );
+          return;
+        }
+
+        // Unique years (for slider)
+        let years = Array.from(new Set(data.map((d) => d.year)))
+          .filter((d) => d != null)
+          .sort(d3.ascending);
+
+        const allIndex = years.length; // last index = "All years"
+
+        yearSlider
+          .attr("min", 0)
+          .attr("max", allIndex)
+          .attr("step", 1)
+          .attr("value", allIndex);
+
+        function formatYearIndex(idx) {
+          if (idx >= allIndex) return "All years";
+          return years[idx];
+        }
+
+        function getFilteredData(idx) {
+          if (idx >= allIndex) return data;
+          const yearVal = years[idx];
+          return data.filter((d) => d.year === yearVal);
+        }
+
+        yearLabel.html(`Year: <strong>${formatYearIndex(allIndex)}</strong>`);
+
+        // === SCALES (fixed based on all data) ===
+        const xExtent = d3.extent(data, (d) => d.artist_familiarity);
+        const yExtent = d3.extent(data, (d) => d.song_hotttnesss);
+
+        const xPad = (xExtent[1] - xExtent[0]) * 0.05 || 0.02;
+        const yPad = (yExtent[1] - yExtent[0]) * 0.05 || 0.02;
+
+        const xScale = d3
+          .scaleLinear()
+          .domain([xExtent[0] - xPad, xExtent[1] + xPad])
+          .range([0, chartWidth]);
+
+        const yScale = d3
+          .scaleLinear()
+          .domain([yExtent[0] - yPad, yExtent[1] + yPad])
+          .range([chartHeight, 0]);
+
+        const xAxis = d3.axisBottom(xScale).ticks(6).tickSizeOuter(0);
+
+        const yAxis = d3.axisLeft(yScale).ticks(6).tickSizeOuter(0);
+
+        xAxisGroup.call(xAxis);
+        yAxisGroup.call(yAxis);
+
+        // Hexbin setup with global extent
+        // === HEXBIN ===
+        const hexbin = d3
+          .hexbin()
+          .x((d) => xScale(d.artist_familiarity))
+          .y((d) => yScale(d.song_hotttnesss))
+          .radius(14)
+          .extent([
+            [0, 0],
+            [chartWidth, chartHeight],
+          ]);
+
+        // --- Density scale: declared once, updated per year in render() ---
+        let maxBinSize = 1; // will be updated in render()
+        const colorDensity = d3
+          .scaleSequential()
+          .domain([0, maxBinSize])
+          .interpolator((t) => d3.interpolateCool(0.3 + 0.7 * t));
+
+        // === LEGEND (for density only) ===
+        const legend = svg
+          .append("g")
+          .attr("class", "legend")
+          .attr(
+            "transform",
+            `translate(${width - margin.right + 18}, ${margin.top})`
+          );
+
+        legend
+          .append("text")
+          .attr("class", "legend-section-title")
+          .attr("x", 0)
+          .attr("y", 0)
+          .text("Density");
+
+        const gradId = "density-gradient";
+        const defs = svg.append("defs");
+        const gradient = defs
+          .append("linearGradient")
+          .attr("id", gradId)
+          .attr("x1", "0%")
+          .attr("x2", "100%")
+          .attr("y1", "0%")
+          .attr("y2", "0%");
+
+        const stops = d3.range(0, 1.01, 0.2);
+        stops.forEach((s) => {
+          gradient
+            .append("stop")
+            .attr("offset", s * 100 + "%")
+            .attr("stop-color", colorDensity(s * maxBinSize));
         });
-    </script>
-  </body>
-</html>
+
+        legend
+          .append("rect")
+          .attr("x", 0)
+          .attr("y", 6)
+          .attr("width", 110)
+          .attr("height", 10)
+          .attr("fill", `url(#${gradId})`);
+
+        legend
+          .append("text")
+          .attr("x", 0)
+          .attr("y", 25)
+          .attr("fill", "#9ca3af")
+          .attr("font-size", 10)
+          .text("Low");
+
+        legend
+          .append("text")
+          .attr("x", 110)
+          .attr("y", 25)
+          .attr("fill", "#9ca3af")
+          .attr("font-size", 10)
+          .attr("text-anchor", "end")
+          .text("High");
+
+        // === RENDER FUNCTION ===
+        function render(filtered) {
+          const bins = hexbin(filtered);
+
+          // Recompute max density for THIS year / subset
+          maxBinSize = d3.max(bins, (b) => b.length) || 1;
+
+          // Update the color scale domain to this year's range
+          colorDensity.domain([0, maxBinSize]);
+
+          const hexPaths = hexLayer
+            .selectAll("path")
+            .data(bins, (d) => `${d.x},${d.y}`);
+
+          hexPaths.exit().remove();
+
+          const hexEnter = hexPaths
+            .enter()
+            .append("path")
+            .attr("d", hexbin.hexagon());
+
+          hexEnter
+            .merge(hexPaths)
+            .attr("transform", (d) => `translate(${d.x},${d.y})`)
+            .style("fill", (d) => colorDensity(d.length))
+            .style("opacity", (d) => 0.2 + 0.8 * (d.length / maxBinSize))
+            .on("mouseover", (event, bin) => {
+              const [mx, my] = d3.pointer(event, wrapper);
+              const count = bin.length;
+
+              // --- POP EFFECT: scale + stroke on hover ---
+              d3.select(event.currentTarget)
+                .raise() // bring this hex on top of others
+                .transition()
+                .duration(120)
+                .attr(
+                  "transform",
+                  (d) => `translate(${d.x},${d.y}) scale(1.25)`
+                )
+                .style("stroke", "#f9fafb")
+                .style("stroke-width", 1.2);
+
+              // bin is an array of original data points in this hex
+              const top5 = bin
+                .slice()
+                .sort((a, b) => b.song_hotttnesss - a.song_hotttnesss)
+                .slice(0, 5);
+
+              const rowsHtml = top5
+                .map((d, i) => {
+                  const hot =
+                    d.song_hotttnesss != null && !isNaN(d.song_hotttnesss)
+                      ? d.song_hotttnesss.toFixed(3)
+                      : "n/a";
+
+                  const fam =
+                    d.artist_familiarity != null &&
+                    !isNaN(d.artist_familiarity)
+                      ? d.artist_familiarity.toFixed(3)
+                      : "n/a";
+
+                  return `<div>#${
+                    i + 1
+                  }: (song_hot=${hot}, artist_fam=${fam})</div>`;
+                })
+                .join("");
+
+              tooltip
+                .style("left", mx + 6 + "px")
+                .style("top", my - 6 + "px")
+                .style("opacity", 1)
+                .style("transform", "translateY(0px)").html(`
+              <div class="title">Bin summary</div>
+              <div class="metrics">
+                <div>Songs in this region: <strong>${count}</strong></div>
+                <div style="margin-top:4px; font-size:10px; color:#9ca3af;">Top by song_hotttnesss:</div>
+                <div style="font-size:10px;">${rowsHtml}</div>
+              </div>
+            `);
+            })
+            .on("mousemove", (event) => {
+              const [mx, my] = d3.pointer(event, wrapper);
+              tooltip
+                .style("left", mx + 6 + "px")
+                .style("top", my - 6 + "px");
+            })
+            .on("mouseout", () => {
+              // --- RETURN TO NORMAL ---
+              d3.select(event.currentTarget)
+                .transition()
+                .duration(120)
+                .attr("transform", (d) => `translate(${d.x},${d.y}) scale(1)`)
+                .style("stroke", "none");
+              tooltip
+                .style("opacity", 0)
+                .style("transform", "translateY(4px)");
+            });
+
+          // OVERLAY TOP HOT SONGS (WHITE RINGS)
+          overlayLayer.selectAll("*").remove();
+
+          if (!filtered.length) return;
+
+          const sortedByHot = filtered
+            .slice()
+            .sort((a, b) => b.song_hotttnesss - a.song_hotttnesss);
+          let topCount = Math.floor(filtered.length * 0.005); // top 0.5%
+          topCount = Math.max(5, Math.min(topCount, 100));
+          const topHotSongs = sortedByHot.slice(0, topCount);
+
+          const durationExtent = d3.extent(
+            topHotSongs,
+            (d) => d.duration || 0
+          );
+          const radiusScale = d3
+            .scaleSqrt()
+            .domain(
+              durationExtent[0] === durationExtent[1]
+                ? [0, durationExtent[1] || 1]
+                : durationExtent
+            )
+            .range([5, 14]);
+
+          const overlay = overlayLayer
+            .selectAll("g.overlay-song")
+            .data(topHotSongs, (d) => d.track_id || d.song_id || d.title);
+
+          const overlayEnter = overlay
+            .enter()
+            .append("g")
+            .attr("class", "overlay-song")
+            .attr(
+              "transform",
+              (d) =>
+                `translate(${xScale(d.artist_familiarity)},${yScale(
+                  d.song_hotttnesss
+                )})`
+            );
+
+          // Glow
+          overlayEnter
+            .append("circle")
+            .attr("class", "highlight-glow")
+            .attr("r", 0)
+            .attr("stroke", "#22d3ee")
+            .transition()
+            .duration(350)
+            .attr(
+              "r",
+              (d) => radiusScale(d.duration || durationExtent[1] || 1) * 1.6
+            );
+
+          // Main ring
+          overlayEnter
+            .append("circle")
+            .attr("class", "highlight-point")
+            .attr("r", 0)
+            .attr("stroke", "#e5e7eb")
+            .style("opacity", 0.95)
+            .transition()
+            .duration(350)
+            .attr("r", (d) =>
+              radiusScale(d.duration || durationExtent[1] || 1)
+            );
+
+          // Tooltip on overlay group
+          overlayEnter
+            .on("mouseover", (event, d) => {
+              const [mx, my] = d3.pointer(event, wrapper);
+
+              const title = d.title || "(Untitled)";
+              const artist = d.artist_name || d.artist || "Unknown artist";
+
+              const hot =
+                d.song_hotttnesss != null && !isNaN(d.song_hotttnesss)
+                  ? d.song_hotttnesss.toFixed(3)
+                  : "n/a";
+
+              const fam =
+                d.artist_familiarity != null && !isNaN(d.artist_familiarity)
+                  ? d.artist_familiarity.toFixed(3)
+                  : "n/a";
+
+              const dur =
+                d.duration != null && !isNaN(d.duration)
+                  ? (d.duration / 60).toFixed(1) + " min"
+                  : "n/a";
+
+              tooltip
+                .style("left", mx + 1 + "px")
+                .style("top", my - 1 + "px")
+                .style("opacity", 1)
+                .style("transform", "translateY(0px)").html(`
+              <div class="title">${title}</div>
+              <div class="meta">${artist} · ${d.year || "Year n/a"}</div>
+              <div class="metrics">
+                <span>Artist familiarity: <strong>${fam}</strong></span><br/>
+                <span>Hotttnesss: <strong>${hot}</strong></span><br/>
+                <span>Duration: <strong>${dur}</strong></span>
+              </div>
+            `);
+            })
+            .on("mousemove", (event) => {
+              const [mx, my] = d3.pointer(event, wrapper);
+              tooltip
+                .style("left", mx + 1 + "px")
+                .style("top", my - 1 + "px");
+            })
+            .on("mouseout", () => {
+              tooltip
+                .style("opacity", 0)
+                .style("transform", "translateY(4px)");
+            });
+        }
+
+        // Initial render with all data
+        render(data);
+
+        // Year slider interaction
+        yearSlider.on("input", (event) => {
+          const idx = +event.target.value;
+          const label = formatYearIndex(idx);
+          yearLabel.html(`Year: <strong>${label}</strong>`);
+          const filtered = getFilteredData(idx);
+          render(filtered);
+        });
+
+        // Zoom & pan
+        const zoom = d3
+          .zoom()
+          .scaleExtent([0.7, 15])
+          .translateExtent([
+            [0, 0],
+            [width, height],
+          ])
+          .extent([
+            [0, 0],
+            [width, height],
+          ])
+          .on("zoom", (event) => {
+            const transform = event.transform;
+            const zx = transform.rescaleX(xScale);
+            const zy = transform.rescaleY(yScale);
+
+            hexLayer.attr("transform", transform);
+            pointsLayer.attr("transform", transform);
+
+            xAxisGroup.call(d3.axisBottom(zx).ticks(6).tickSizeOuter(0));
+            yAxisGroup.call(d3.axisLeft(zy).ticks(6).tickSizeOuter(0));
+          });
+
+        svg.call(zoom);
+      })
+      .catch((err) => {
+        console.error("Error loading CSV:", err);
+        d3.select("#chart")
+          .append("div")
+          .style("color", "#f87171")
+          .style("font-size", "13px")
+          .style("padding", "12px")
+          .text(
+            "Failed to load songs.csv. Check the file path/name and refresh."
+          );
+      });
+  </script>
+</body>
