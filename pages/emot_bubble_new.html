@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Emotion Bubble Explorer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      :root {
+        --bg: #050915;
+        --panel: #0c1224;
+        --surface: #0f172a;
+        --border: #1f2937;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --accent: #60a5fa;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.08), transparent 28%),
+          radial-gradient(circle at 80% 30%, rgba(244, 114, 182, 0.08), transparent 30%),
+          var(--bg);
+        color: var(--text);
+        font-family: "Inter", "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 18px 10px;
+        background: linear-gradient(90deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.92));
+        border-bottom: 1px solid var(--border);
+      }
+      .title {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+      }
+      .subtitle {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .control {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .control select {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+        min-width: 150px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+      .nav-buttons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .arrow-btn {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease,
+          background 120ms ease;
+      }
+      .arrow-btn:hover {
+        transform: translateY(-1px);
+        border-color: rgba(96, 165, 250, 0.6);
+      }
+      .arrow-btn:active {
+        transform: translateY(0);
+      }
+      main {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 12px;
+        padding: 12px 18px 18px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: 0 18px 30px rgba(0, 0, 0, 0.35);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+      .panel-header .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 2px;
+      }
+      .panel-header .panel-title {
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .chip {
+        border: 1px solid rgba(96, 165, 250, 0.35);
+        color: #c7d2fe;
+        background: rgba(96, 165, 250, 0.08);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 11px;
+        letter-spacing: 0.2px;
+      }
+      .panel-body {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+      }
+      #bubble-body {
+        padding: 6px 10px 10px;
+      }
+      #bubble-svg {
+        width: 100%;
+        height: 100%;
+      }
+      #legend {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 6px 12px;
+        background: rgba(5, 9, 21, 0.72);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
+        max-width: 320px;
+      }
+      #legend .item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--text);
+      }
+      #legend .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      #bar-body {
+        padding: 8px 12px 12px;
+        overflow-y: auto;
+      }
+      #bar-svg {
+        width: 100%;
+        min-height: 260px;
+      }
+      .empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 13px;
+        letter-spacing: 0.2px;
+      }
+      .bubble-label {
+        fill: var(--text);
+        pointer-events: none;
+        text-anchor: middle;
+        font-weight: 600;
+      }
+      .bubble-group circle {
+        stroke: rgba(0, 0, 0, 0.35);
+        stroke-width: 0.8;
+      }
+      @media (max-width: 1100px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        #legend {
+          max-width: 90%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top-bar">
+      <div>
+        <div class="title">Emotion Bubble Explorer</div>
+        <div class="subtitle">
+          Choose a decade and focus emotion. Left shows every emotion bubble
+          for that decade, right shows words for the chosen emotion.
+        </div>
+      </div>
+      <div class="controls">
+        <div class="nav-buttons">
+          <button class="arrow-btn" id="prev-decade" aria-label="Previous decade">
+            ←
+          </button>
+          <button class="arrow-btn" id="next-decade" aria-label="Next decade">
+            →
+          </button>
+        </div>
+        <label class="control">
+          Decade
+          <select id="decade-select"></select>
+        </label>
+        <label class="control">
+          Emotion
+          <select id="emotion-select"></select>
+        </label>
+      </div>
+    </div>
+
+    <main>
+      <section class="panel" id="bubble-panel">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Bubble field</div>
+            <div class="panel-title" id="decade-label">Decade</div>
+          </div>
+          <div class="chip">all emotions visible</div>
+        </div>
+        <div class="panel-body" id="bubble-body">
+          <svg id="bubble-svg"></svg>
+          <div id="legend"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="bar-panel">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Word strength</div>
+            <div class="panel-title" id="bar-title">Emotion</div>
+          </div>
+          <div class="chip" id="bar-chip">top words</div>
+        </div>
+        <div class="panel-body" id="bar-body">
+          <div class="empty" id="bar-empty">
+            Select a decade and emotion to see bar chart.
+          </div>
+          <svg id="bar-svg"></svg>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      // Data files
+      const decadeFiles = {
+        "1920s": "Data/bubbles_1920.csv",
+        "1930s": "Data/bubbles_1930.csv",
+        "1940s": "Data/bubbles_1940.csv",
+        "1950s": "Data/bubbles_1950.csv",
+        "1960s": "Data/bubbles_1960.csv",
+        "1970s": "Data/bubbles_1970.csv",
+        "1980s": "Data/bubbles_1980.csv",
+        "1990s": "Data/bubbles_1990.csv",
+        "2000s": "Data/bubbles_2000.csv",
+        "2010s": "Data/bubbles_2010.csv",
+      };
+      const stopwordsPath = "Data/stopwords.json";
+      const entries = Object.entries(decadeFiles);
+
+      // DOM references
+      const decadeSelect = document.getElementById("decade-select");
+      const emotionSelect = document.getElementById("emotion-select");
+      const decadeLabel = document.getElementById("decade-label");
+      const barTitle = document.getElementById("bar-title");
+      const barChip = document.getElementById("bar-chip");
+      const barEmpty = document.getElementById("bar-empty");
+      const bubbleBody = document.getElementById("bubble-body");
+      const barBody = document.getElementById("bar-body");
+      const prevBtn = document.getElementById("prev-decade");
+      const nextBtn = document.getElementById("next-decade");
+
+      // SVG layers
+      const bubbleSvg = d3.select("#bubble-svg");
+      const bubbleLayer = bubbleSvg.append("g").attr("class", "bubble-group");
+      const barSvg = d3.select("#bar-svg");
+
+      // Data holders
+      const decadeData = new Map();
+      let emotions = [];
+      let colorScale = null;
+      let currentDecade = null;
+      let currentEmotion = null;
+      const bubbleScaleFactor = 1.4; // enlarge bubble radii
+
+      // Load everything
+      Promise.all([
+        d3.json(stopwordsPath),
+        Promise.all(
+          entries.map(([label, file]) =>
+            d3.csv(file, d3.autoType).then((rows) => ({ label, rows }))
+          )
+        ),
+      ])
+        .then(([stopwordsRaw, datasets]) => {
+          const stopwords = new Set(
+            (stopwordsRaw || []).map((w) => String(w).toLowerCase())
+          );
+          const seenEmotions = new Set();
+
+          datasets.forEach((ds) => {
+            const clean = ds.rows
+              .map((d) => ({
+                word: d.word == null ? "" : String(d.word),
+                emotion: d.emotion == null ? "" : String(d.emotion),
+                count: +d.count || 0,
+              }))
+              .filter((d) => {
+                if (!d.word || !d.emotion) return false;
+                const wordLower = d.word.toLowerCase();
+                const isNeutral = d.emotion.toLowerCase() === "neutral";
+                return !isNeutral && !stopwords.has(wordLower);
+              });
+
+            // Aggregate duplicates
+            const rollups = d3.rollups(
+              clean,
+              (v) => d3.sum(v, (x) => x.count),
+              (d) => d.word,
+              (d) => d.emotion
+            );
+
+            const flattened = [];
+            rollups.forEach(([word, emoList]) => {
+              emoList.forEach(([emotion, total]) => {
+                flattened.push({ word, emotion, count: total });
+                seenEmotions.add(emotion);
+              });
+            });
+
+            const TOP_BUBBLES = 200;
+            const topWords = flattened
+              .sort((a, b) => d3.descending(a.count, b.count))
+              .slice(0, TOP_BUBBLES);
+
+            decadeData.set(ds.label, topWords);
+          });
+
+          emotions = Array.from(seenEmotions).sort();
+          colorScale = d3
+            .scaleOrdinal()
+            .domain(emotions)
+            .range([
+              "#60a5fa",
+              "#c084fc",
+              "#f472b6",
+              "#f59e0b",
+              "#22c55e",
+              "#34d399",
+              "#fb7185",
+              "#a3e635",
+              "#38bdf8",
+            ]);
+
+          initControls();
+          renderLegend();
+
+          currentDecade = entries[entries.length - 1][0]; // latest decade
+          currentEmotion = emotions.includes("joy")
+            ? "joy"
+            : emotions[0] || null;
+
+          decadeSelect.value = currentDecade;
+          emotionSelect.value = currentEmotion;
+          updateLabels();
+          renderBubbles(currentDecade, true);
+          renderBars(currentEmotion);
+          window.addEventListener("resize", () => renderBubbles(currentDecade));
+        })
+        .catch((err) => {
+          console.error(err);
+          document.body.insertAdjacentHTML(
+            "beforeend",
+            `<div style="color:#f87171;padding:12px;">Error loading data: ${err}</div>`
+          );
+        });
+
+      function initControls() {
+        entries.forEach(([label]) => {
+          const opt = document.createElement("option");
+          opt.value = label;
+          opt.textContent = label;
+          decadeSelect.appendChild(opt);
+        });
+
+        emotions.forEach((emo) => {
+          const opt = document.createElement("option");
+          opt.value = emo;
+          opt.textContent = emo;
+          emotionSelect.appendChild(opt);
+        });
+
+        decadeSelect.addEventListener("change", (e) => {
+          currentDecade = e.target.value;
+          updateLabels();
+          renderBubbles(currentDecade, true);
+          renderBars(currentEmotion);
+        });
+
+        emotionSelect.addEventListener("change", (e) => {
+          currentEmotion = e.target.value;
+          updateLabels();
+          applyEmotionFocus();
+          renderBars(currentEmotion);
+        });
+
+        prevBtn.addEventListener("click", () => changeDecade(-1));
+        nextBtn.addEventListener("click", () => changeDecade(1));
+      }
+
+      function changeDecade(step) {
+        const labels = entries.map(([l]) => l);
+        const idx = labels.indexOf(currentDecade);
+        if (idx === -1) return;
+        const nextIdx = (idx + step + labels.length) % labels.length;
+        const nextLabel = labels[nextIdx];
+        if (nextLabel === currentDecade) return;
+        currentDecade = nextLabel;
+        decadeSelect.value = currentDecade;
+        updateLabels();
+        renderBubbles(currentDecade, true);
+        renderBars(currentEmotion);
+      }
+
+      function updateLabels() {
+        decadeLabel.textContent = currentDecade || "Decade";
+        barTitle.textContent = currentEmotion
+          ? `${currentEmotion} in ${currentDecade}`
+          : "Emotion";
+        barChip.textContent = "top words";
+      }
+
+      function renderLegend() {
+        const legend = document.getElementById("legend");
+        legend.innerHTML = "";
+        emotions.forEach((emo) => {
+          const item = document.createElement("div");
+          item.className = "item";
+          const swatch = document.createElement("div");
+          swatch.className = "swatch";
+          swatch.style.background = colorScale(emo);
+          item.appendChild(swatch);
+          const label = document.createElement("div");
+          label.textContent = emo;
+          item.appendChild(label);
+          legend.appendChild(item);
+        });
+      }
+
+      function renderBubbles(decade, animate = false) {
+        const data = decadeData.get(decade) || [];
+        const width = bubbleBody.clientWidth || 800;
+        const height = bubbleBody.clientHeight || 620;
+
+        bubbleSvg.attr("width", width).attr("height", height);
+        bubbleLayer.attr("transform", "translate(0,0)");
+
+        if (!data.length) {
+          bubbleLayer.selectAll("*").remove();
+          bubbleLayer
+            .append("text")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#f87171")
+            .text("No data for this decade.");
+          return;
+        }
+
+        const grouped = d3.groups(data, (d) => d.emotion);
+        const root = d3
+          .hierarchy({
+            children: grouped.map(([emotion, words]) => ({
+              emotion,
+              children: words,
+            })),
+          })
+          .sum((d) => d.count * bubbleScaleFactor);
+
+        const pack = d3.pack().size([width, height]).padding(5);
+        const leaves = pack(root).leaves();
+
+        const nodes = bubbleLayer
+          .selectAll("g.node")
+          .data(
+            leaves,
+            (d) => `${d.data.word}|${d.data.emotion}`
+          );
+
+        const exiting = nodes.exit();
+        exiting
+          .select("circle")
+          .transition()
+          .duration(400)
+          .attr("r", 0);
+        exiting
+          .transition()
+          .duration(400)
+          .style("opacity", 0)
+          .remove();
+
+        const enter = nodes
+          .enter()
+          .append("g")
+          .attr("class", "node")
+          .attr("transform", `translate(${width / 2},${height / 2})`)
+          .style("opacity", 0);
+
+        enter
+          .append("circle")
+          .attr("r", 0)
+          .attr("fill", (d) => colorScale(d.data.emotion))
+          .attr("fill-opacity", 0.92);
+
+        enter
+          .append("text")
+          .attr("class", "bubble-label")
+          .attr("dy", "0.32em")
+          .style("opacity", 0)
+          .text((d) => (d.r < 12 ? "" : d.data.word));
+
+        enter.append("title").text(
+          (d) => `Word: ${d.data.word}
+Emotion: ${d.data.emotion}
+Count: ${d.data.count}`
+        );
+
+        const merged = enter.merge(nodes);
+
+        merged
+          .transition()
+          .duration(animate ? 750 : 0)
+          .ease(d3.easeCubicOut)
+          .attr("transform", (d) => `translate(${d.x},${d.y})`)
+          .style("opacity", 1);
+
+        merged
+          .select("circle")
+          .transition()
+          .duration(animate ? 750 : 0)
+          .ease(d3.easeCubicOut)
+          .attr("r", (d) => d.r)
+          .attr("fill", (d) => colorScale(d.data.emotion));
+
+        merged
+          .select("text")
+          .text((d) => (d.r < 12 ? "" : d.data.word))
+          .transition()
+          .duration(animate ? 500 : 0)
+          .style("opacity", (d) => (d.r < 12 ? 0 : 0.95))
+          .style("font-size", (d) => {
+            const size = Math.max(9, Math.min(18, d.r * 0.4));
+            return `${size}px`;
+          });
+
+        merged
+          .select("title")
+          .text(
+            (d) => `Word: ${d.data.word}
+Emotion: ${d.data.emotion}
+Count: ${d.data.count}`
+          );
+
+        applyEmotionFocus();
+      }
+
+      function applyEmotionFocus() {
+        const active = currentEmotion;
+        bubbleLayer.selectAll("g.node").each(function (d) {
+          const faded = active ? d.data.emotion !== active : false;
+          const isActive = active ? d.data.emotion === active : true;
+          const circle = d3.select(this).select("circle");
+          const label = d3.select(this).select("text");
+
+          circle
+            .transition()
+            .duration(250)
+            .attr("fill-opacity", faded ? 0.32 : 0.95)
+            .attr("stroke-width", isActive ? 1.1 : 0.75);
+
+          label
+            .transition()
+            .duration(200)
+            .style("opacity", () =>
+              d.r < 12 ? 0 : isActive || !active ? 0.95 : 0.25
+            );
+        });
+      }
+
+      function renderBars(emotion) {
+        const data = (decadeData.get(currentDecade) || []).filter(
+          (d) => d.emotion === emotion
+        );
+
+        if (!data.length) {
+          barEmpty.style.display = "flex";
+          barSvg.style("display", "none");
+          barTitle.textContent = `No data for ${emotion} in ${currentDecade}`;
+          return;
+        }
+
+        barEmpty.style.display = "none";
+        barSvg.style("display", "block");
+        barTitle.textContent = `${emotion} in ${currentDecade}`;
+
+        const width = barBody.clientWidth || 420;
+        const BAR_COUNT = 18;
+        const sorted = data
+          .slice()
+          .sort((a, b) => d3.descending(a.count, b.count))
+          .slice(0, BAR_COUNT);
+
+        const margin = { top: 24, right: 30, bottom: 24, left: 140 };
+        const barHeight = 26;
+        const innerHeight = Math.max(1, sorted.length * barHeight);
+        const height = innerHeight + margin.top + margin.bottom;
+
+        barSvg.attr("width", width).attr("height", Math.max(height, 260));
+        barSvg.selectAll("*").remove();
+
+        const x = d3
+          .scaleLinear()
+          .domain([0, d3.max(sorted, (d) => d.count) || 1])
+          .nice()
+          .range([0, width - margin.left - margin.right]);
+
+        const y = d3
+          .scaleBand()
+          .domain(sorted.map((d) => d.word))
+          .range([0, innerHeight])
+          .padding(0.2);
+
+        const g = barSvg
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const bars = g
+          .selectAll(".bar")
+          .data(sorted, (d) => d.word)
+          .join((enter) => {
+            const grp = enter.append("g").attr("class", "bar");
+            grp
+              .append("rect")
+              .attr("x", 0)
+              .attr("y", (d) => y(d.word) || 0)
+              .attr("height", y.bandwidth())
+              .attr("width", 0)
+              .attr("fill", colorScale(emotion))
+              .attr("rx", 6);
+
+            grp
+              .append("text")
+              .attr("x", -10)
+              .attr("y", (d) => (y(d.word) || 0) + y.bandwidth() / 2)
+              .attr("text-anchor", "end")
+              .attr("dominant-baseline", "middle")
+              .attr("fill", varMuted)
+              .text((d) => d.word);
+
+            grp
+              .append("text")
+              .attr("class", "count")
+              .attr("x", 8)
+              .attr("y", (d) => (y(d.word) || 0) + y.bandwidth() / 2)
+              .attr("dominant-baseline", "middle")
+              .attr("fill", "#e5e7eb")
+              .attr("font-weight", 600)
+              .style("opacity", 0);
+            return grp;
+          });
+
+        bars
+          .select("rect")
+          .transition()
+          .duration(600)
+          .attr("y", (d) => y(d.word) || 0)
+          .attr("height", y.bandwidth())
+          .attr("width", (d) => x(d.count))
+          .attr("fill", colorScale(emotion));
+
+        bars
+          .select(".count")
+          .transition()
+          .duration(600)
+          .attr("x", (d) => x(d.count) + 10)
+          .attr("y", (d) => (y(d.word) || 0) + y.bandwidth() / 2)
+          .style("opacity", 1)
+          .text((d) => d.count);
+
+        bars
+          .select("text:not(.count)")
+          .transition()
+          .duration(400)
+          .attr("y", (d) => (y(d.word) || 0) + y.bandwidth() / 2);
+
+        g.append("g")
+          .call(d3.axisTop(x).ticks(4).tickSize(-innerHeight))
+          .selectAll("text")
+          .attr("fill", varMuted)
+          .attr("font-size", 11);
+
+        g.selectAll(".tick line")
+          .attr("stroke", "#1f2937")
+          .attr("stroke-opacity", 0.8);
+
+        g.selectAll(".domain").remove();
+      }
+
+      const varMuted = "#9ca3af";
+    </script>
+  </body>
+</html>

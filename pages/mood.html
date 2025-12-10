@@ -1,753 +1,748 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Lyric Mood Calendar</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <style>
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
-        background: #020617; /* dark */
-        color: #e5e7eb;
-        font-size: 14px;
-      }
-      #chart {
-        width: 100%;
-        height: 100vh;
-        overflow: auto;
-        padding: 12px 16px;
-        box-sizing: border-box;
-      }
-      .title {
-        font-size: 22px;
-        font-weight: 600;
-        text-anchor: middle;
-        fill: #e5e7eb;
-      }
-      .subtitle {
-        font-size: 13px;
-        fill: #9ca3af;
-      }
-      .emotion-label {
-        text-anchor: end;
-        alignment-baseline: middle;
-        fill: #e5e7eb;
-        font-size: 13px;
-        cursor: pointer; /* interactive */
-        transition: transform 0.12s ease-out;
-      }
-      .emotion-label.active {
-        font-weight: 600;
-        text-shadow: 0 0 6px rgba(250, 204, 21, 0.7);
-      }
-      .event-label {
-        fill: #fbbf24;
-        font-size: 10px;
-      }
-      .legend-title {
-        fill: #e5e7eb;
-        font-size: 12px;
-        font-weight: 600;
-      }
-      .legend-text {
-        fill: #e5e7eb;
-        font-size: 11px;
-      }
+<meta charset="UTF-8" />
+<title>Lyric Mood Calendar</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      sans-serif;
+    background: #020617; /* dark */
+    color: #e5e7eb;
+    font-size: 14px;
+  }
+  #chart {
+    width: 100vw;
+    height: 100vh;
+    overflow: auto;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  .title {
+    font-size: 22px;
+    font-weight: 600;
+    text-anchor: middle;
+    fill: #e5e7eb;
+  }
+  .subtitle {
+    font-size: 13px;
+    fill: #9ca3af;
+  }
+  .emotion-label {
+    text-anchor: end;
+    alignment-baseline: middle;
+    fill: #e5e7eb;
+    font-size: 13px;
+    cursor: pointer; /* interactive */
+    transition: transform 0.12s ease-out;
+  }
+  .emotion-label.active {
+    font-weight: 600;
+    text-shadow: 0 0 6px rgba(250, 204, 21, 0.7);
+  }
+  .event-label {
+    fill: #fbbf24;
+    font-size: 10px;
+  }
+  .legend-title {
+    fill: #e5e7eb;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .legend-text {
+    fill: #e5e7eb;
+    font-size: 11px;
+  }
 
-      /* Floating hover panel for cells */
-      #hover-panel {
-        position: fixed;
-        pointer-events: none;
-        background: rgba(15, 23, 42, 0.96);
-        border-radius: 8px;
-        border: 1px solid #1f2937;
-        padding: 6px 8px;
-        font-size: 12px;
-        color: #e5e7eb;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
-        opacity: 0;
-        transform: translate(-50%, -120%);
-        transition: opacity 0.12s ease-out;
-        max-width: 280px;
-        z-index: 10;
-        white-space: normal;
-      }
-      #hover-panel .header {
-        font-weight: 600;
-        margin-bottom: 2px;
-      }
-      #hover-panel .emotion {
-        font-weight: 600;
-      }
-      #hover-panel .words {
-        font-size: 11px;
-        opacity: 0.9;
-        margin-top: 4px;
-        line-height: 1.3;
-      }
+  /* Floating hover panel for cells */
+  #hover-panel {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.96);
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+    padding: 6px 8px;
+    font-size: 12px;
+    color: #e5e7eb;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    transform: translate(-50%, -120%);
+    transition: opacity 0.12s ease-out;
+    max-width: 280px;
+    z-index: 10;
+    white-space: normal;
+  }
+  #hover-panel .header {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  #hover-panel .emotion {
+    font-weight: 600;
+  }
+  #hover-panel .words {
+    font-size: 11px;
+    opacity: 0.9;
+    margin-top: 4px;
+    line-height: 1.3;
+  }
 
-      /* Emotion trend tooltip (mini line chart near label) */
-      #trend-tooltip {
-        position: fixed;
-        pointer-events: none;
-        background: rgba(15, 23, 42, 0.98);
-        border-radius: 8px;
-        border: 1px solid #1f2937;
-        padding: 6px 8px 8px 8px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
-        font-size: 12px;
-        color: #e5e7eb;
-        z-index: 9;
-        opacity: 0;
-        transition: opacity 0.12s ease-out;
-        width: 620px; /* 👈 explicit width */
-        max-width: 620px; /* keep it consistent */
-      }
+  /* Emotion trend tooltip (mini line chart near label) */
+  #trend-tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.98);
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+    padding: 6px 8px 8px 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+    font-size: 12px;
+    color: #e5e7eb;
+    z-index: 9;
+    opacity: 0;
+    transition: opacity 0.12s ease-out;
+    width: 620px; /* 👈 explicit width */
+    max-width: 620px; /* keep it consistent */
+  }
 
-      #trend-tooltip .header {
-        font-weight: 600;
-        margin-bottom: 2px;
-      }
-      #trend-tooltip .sub {
-        font-size: 11px;
-        color: #9ca3af;
-        margin-bottom: 4px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="chart"></div>
-    <div id="hover-panel"></div>
-    <div id="trend-tooltip"></div>
+  #trend-tooltip .header {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  #trend-tooltip .sub {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-bottom: 4px;
+  }
+</style>
+<body>
+  <div id="chart"></div>
+  <div id="hover-panel"></div>
+  <div id="trend-tooltip"></div>
 
-    <script>
-      const csvFile = "./Data/mood_calendar.csv"; // must be in same folder
+  <script>
+    const csvFile = "./Data/mood_calendar.csv"; // must be in same folder
 
-      d3.csv(csvFile, d3.autoType)
-        .then((raw) => {
-          // Expect: period, emotion, total_count, prop, (optional) top_words
-          let data = raw.map((d) => ({
-            period: d.period,
-            emotion: d.emotion,
-            total_count: +d.total_count,
-            prop: +d.prop,
-            top_words: d.top_words || "",
-          }));
+    d3.csv(csvFile, d3.autoType)
+      .then((raw) => {
+        // Expect: period, emotion, total_count, prop, (optional) top_words
+        let data = raw.map((d) => ({
+          period: d.period,
+          emotion: d.emotion,
+          total_count: +d.total_count,
+          prop: +d.prop,
+          top_words: d.top_words || "",
+        }));
 
-          // Safety: drop neutral and nulls
-          data = data.filter(
-            (d) =>
-              d.period != null &&
-              d.emotion &&
-              d.emotion.toLowerCase() !== "neutral"
+        // Safety: drop neutral and nulls
+        data = data.filter(
+          (d) =>
+            d.period != null &&
+            d.emotion &&
+            d.emotion.toLowerCase() !== "neutral"
+        );
+
+        // Unique periods & emotions
+        const periods = Array.from(new Set(data.map((d) => d.period))).sort(
+          d3.ascending
+        );
+        const emotions = Array.from(new Set(data.map((d) => d.emotion))).sort(
+          d3.ascending
+        );
+
+        // Color palette by emotion (high-contrast on dark bg)
+        const baseEmotionColors = {
+          joy: "#facc15",
+          happiness: "#facc15",
+          sadness: "#60a5fa",
+          anger: "#f97373",
+          fear: "#a855f7",
+          surprise: "#22d3ee",
+          disgust: "#22c55e",
+          // add more if you have more emotion labels
+        };
+        const fallbackColor = "#a3a3a3";
+
+        const emotionColor = d3
+          .scaleOrdinal()
+          .domain(emotions)
+          .range(
+            emotions.map((e) => {
+              const key = e.toLowerCase();
+              return baseEmotionColors[key] || fallbackColor;
+            })
           );
 
-          // Unique periods & emotions
-          const periods = Array.from(new Set(data.map((d) => d.period))).sort(
-            d3.ascending
+        // -----------------------------
+        // Per-emotion intensity range (so we stretch contrast per row)
+        // -----------------------------
+        const emotionRanges = new Map();
+        emotions.forEach((e) => {
+          const vals = data
+            .filter((d) => d.emotion === e)
+            .map((d) => d.prop)
+            .filter((v) => Number.isFinite(v));
+
+          if (!vals.length) {
+            emotionRanges.set(e, { min: 0, max: 1 });
+          } else {
+            emotionRanges.set(e, {
+              min: d3.min(vals),
+              max: d3.max(vals),
+            });
+          }
+        });
+
+        // -----------------------------
+        // Build lookup: (emotion, period) -> record
+        // -----------------------------
+        const lookup = new Map();
+        data.forEach((d) => {
+          lookup.set(`${d.emotion}||${d.period}`, d);
+        });
+
+        // -----------------------------
+        // Layout (multi-row periods)
+        // -----------------------------
+        //   const cellWidth = 45; // width of one period column
+        //   const cellHeight = 28; // height of one emotion row
+        //   const PERIODS_PER_ROW = 22; // <<< play with this: 3, 5, 10, etc.
+        //   const margin = { top: 60, right: 180, bottom: 40, left: 80 };
+        const UI_SCALE = 1.2; // 👈 try 1.2, 1.3, 1.5 etc.
+
+        const cellWidth = 45 * UI_SCALE; // width of one period column
+        const cellHeight = 28 * UI_SCALE; // height of one emotion row
+        const PERIODS_PER_ROW = 22; // same as before
+        const margin = {
+          top: 60 * UI_SCALE,
+          right: 180 * UI_SCALE,
+          bottom: 40 * UI_SCALE,
+          left: 200 * UI_SCALE,
+        };
+
+        const nBlocks = Math.ceil(periods.length / PERIODS_PER_ROW);
+        const periodCols = Math.min(PERIODS_PER_ROW, periods.length);
+        const blockHeight = emotions.length * cellHeight;
+        const blockGap = 40; // vertical gap between blocks
+
+        const width = periodCols * cellWidth + margin.left + margin.right;
+        const height =
+          nBlocks * blockHeight +
+          (nBlocks - 1) * blockGap +
+          margin.top +
+          margin.bottom;
+
+        const svg = d3
+          .select("#chart")
+          .append("svg")
+          .attr("width", width)
+          .attr("height", height);
+
+        const hoverPanel = d3.select("#hover-panel");
+        const trendTooltip = d3.select("#trend-tooltip");
+
+        // Title + subtitle
+        svg
+          .append("text")
+          .attr("class", "title")
+          .attr("x", width / 2)
+          .attr("y", 24)
+          .text("Lyric Mood Calendar");
+
+        svg
+          .append("text")
+          .attr("class", "subtitle")
+          .attr("x", width / 2)
+          .attr("y", 40)
+          .attr("text-anchor", "middle")
+          .text(
+            "Each cell: proportion of an emotion in lyrics for that period (darker = more of that emotion)"
           );
-          const emotions = Array.from(new Set(data.map((d) => d.emotion))).sort(
-            d3.ascending
-          );
 
-          // Color palette by emotion (high-contrast on dark bg)
-          const baseEmotionColors = {
-            joy: "#facc15",
-            happiness: "#facc15",
-            sadness: "#60a5fa",
-            anger: "#f97373",
-            fear: "#a855f7",
-            surprise: "#22d3ee",
-            disgust: "#22c55e",
-            // add more if you have more emotion labels
-          };
-          const fallbackColor = "#a3a3a3";
+        const g = svg
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
 
-          const emotionColor = d3
-            .scaleOrdinal()
-            .domain(emotions)
-            .range(
-              emotions.map((e) => {
-                const key = e.toLowerCase();
-                return baseEmotionColors[key] || fallbackColor;
-              })
-            );
+        // Drop shadow filter for hover "pop"
+        const defs = svg.append("defs");
+        const cellShadow = defs
+          .append("filter")
+          .attr("id", "cellShadow")
+          .attr("x", "-30%")
+          .attr("y", "-30%")
+          .attr("width", "160%")
+          .attr("height", "160%");
 
-          // -----------------------------
-          // Per-emotion intensity range (so we stretch contrast per row)
-          // -----------------------------
-          const emotionRanges = new Map();
-          emotions.forEach((e) => {
-            const vals = data
-              .filter((d) => d.emotion === e)
-              .map((d) => d.prop)
-              .filter((v) => Number.isFinite(v));
+        cellShadow
+          .append("feDropShadow")
+          .attr("dx", 1.2)
+          .attr("dy", 1.8)
+          .attr("stdDeviation", 2)
+          .attr("flood-color", "#000000")
+          .attr("flood-opacity", 0.55);
 
-            if (!vals.length) {
-              emotionRanges.set(e, { min: 0, max: 1 });
-            } else {
-              emotionRanges.set(e, {
-                min: d3.min(vals),
-                max: d3.max(vals),
-              });
-            }
+        // Emotion band scale within a block
+        const yEmotion = d3
+          .scaleBand()
+          .domain(emotions)
+          .range([0, blockHeight])
+          .padding(0.15);
+
+        // period -> global index -> (block row, column)
+        const periodIndex = new Map();
+        periods.forEach((p, i) => periodIndex.set(p, i));
+
+        // -----------------------------
+        // Helper: show / move / hide trend tooltip
+        // -----------------------------
+        function showTrendTooltip(event, emotion, blockIndex) {
+          // Only periods in this row (block)
+          const startIdx = blockIndex * PERIODS_PER_ROW;
+          const endIdx = Math.min(startIdx + PERIODS_PER_ROW, periods.length);
+          const rowPeriods = periods.slice(startIdx, endIdx);
+
+          const series = rowPeriods.map((p) => {
+            const rec = lookup.get(`${emotion}||${p}`);
+            return {
+              period: p,
+              value: rec ? rec.total_count : 0,
+            };
           });
 
-          // -----------------------------
-          // Build lookup: (emotion, period) -> record
-          // -----------------------------
-          const lookup = new Map();
-          data.forEach((d) => {
-            lookup.set(`${d.emotion}||${d.period}`, d);
-          });
+          if (!series.length) return;
 
-          // -----------------------------
-          // Layout (multi-row periods)
-          // -----------------------------
-          //   const cellWidth = 45; // width of one period column
-          //   const cellHeight = 28; // height of one emotion row
-          //   const PERIODS_PER_ROW = 22; // <<< play with this: 3, 5, 10, etc.
-          //   const margin = { top: 60, right: 180, bottom: 40, left: 80 };
-          const UI_SCALE = 1.2; // 👈 try 1.2, 1.3, 1.5 etc.
+          const tooltipWidth = 620; // 👈
+          const tooltipHeight = 150;
+          const tMargin = { top: 22, right: 10, bottom: 40, left: 40 };
+          const innerWidth = tooltipWidth - tMargin.left - tMargin.right;
+          const innerHeight = tooltipHeight - tMargin.top - tMargin.bottom;
 
-          const cellWidth = 45 * UI_SCALE; // width of one period column
-          const cellHeight = 28 * UI_SCALE; // height of one emotion row
-          const PERIODS_PER_ROW = 22; // same as before
-          const margin = {
-            top: 60 * UI_SCALE,
-            right: 180 * UI_SCALE,
-            bottom: 40 * UI_SCALE,
-            left: 200 * UI_SCALE,
-          };
+          const color = emotionColor(emotion) || "#fbbf24";
 
-          const nBlocks = Math.ceil(periods.length / PERIODS_PER_ROW);
-          const periodCols = Math.min(PERIODS_PER_ROW, periods.length);
-          const blockHeight = emotions.length * cellHeight;
-          const blockGap = 40; // vertical gap between blocks
+          trendTooltip
+            .style("opacity", 1)
+            .style("left", event.clientX + 14 + "px")
+            .style("top", event.clientY - 10 + "px")
+            .html(""); // clear
 
-          const width = periodCols * cellWidth + margin.left + margin.right;
-          const height =
-            nBlocks * blockHeight +
-            (nBlocks - 1) * blockGap +
-            margin.top +
-            margin.bottom;
+          trendTooltip
+            .append("div")
+            .attr("class", "header")
+            .text(`${emotion} – total word count`);
 
-          const svg = d3
-            .select("#chart")
+          trendTooltip
+            .append("div")
+            .attr("class", "sub")
+            .text("Only periods shown in this row");
+
+          const svgTT = trendTooltip
             .append("svg")
-            .attr("width", width)
-            .attr("height", height);
+            .attr("width", tooltipWidth)
+            .attr("height", tooltipHeight);
 
-          const hoverPanel = d3.select("#hover-panel");
-          const trendTooltip = d3.select("#trend-tooltip");
-
-          // Title + subtitle
-          svg
-            .append("text")
-            .attr("class", "title")
-            .attr("x", width / 2)
-            .attr("y", 24)
-            .text("Lyric Mood Calendar");
-
-          svg
-            .append("text")
-            .attr("class", "subtitle")
-            .attr("x", width / 2)
-            .attr("y", 40)
-            .attr("text-anchor", "middle")
-            .text(
-              "Each cell: proportion of an emotion in lyrics for that period (darker = more of that emotion)"
-            );
-
-          const g = svg
+          const gTT = svgTT
             .append("g")
-            .attr("transform", `translate(${margin.left},${margin.top})`);
+            .attr("transform", `translate(${tMargin.left},${tMargin.top})`);
 
-          // Drop shadow filter for hover "pop"
-          const defs = svg.append("defs");
-          const cellShadow = defs
-            .append("filter")
-            .attr("id", "cellShadow")
-            .attr("x", "-30%")
-            .attr("y", "-30%")
-            .attr("width", "160%")
-            .attr("height", "160%");
+          const xTT = d3
+            .scalePoint()
+            .domain(series.map((d) => d.period))
+            .range([0, innerWidth]);
 
-          cellShadow
-            .append("feDropShadow")
-            .attr("dx", 1.2)
-            .attr("dy", 1.8)
-            .attr("stdDeviation", 2)
-            .attr("flood-color", "#000000")
-            .attr("flood-opacity", 0.55);
+          const maxVal = d3.max(series, (d) => d.value) || 1;
+          const yTT = d3
+            .scaleLinear()
+            .domain([0, maxVal])
+            .nice()
+            .range([innerHeight, 0]);
 
-          // Emotion band scale within a block
-          const yEmotion = d3
-            .scaleBand()
-            .domain(emotions)
-            .range([0, blockHeight])
-            .padding(0.15);
+          const xAxis = d3.axisBottom(xTT);
+          const yAxis = d3
+            .axisLeft(yTT)
+            .ticks(3)
+            .tickFormat(d3.format(".2s"));
 
-          // period -> global index -> (block row, column)
-          const periodIndex = new Map();
-          periods.forEach((p, i) => periodIndex.set(p, i));
+          gTT
+            .append("g")
+            .attr("transform", `translate(0,${innerHeight})`)
+            .call(xAxis)
+            .selectAll("text")
+            .attr("fill", "#e5e7eb")
+            .attr("font-size", 9)
+            .attr("transform", "rotate(-45)")
+            .attr("text-anchor", "end")
+            .attr("dx", "-0.4em")
+            .attr("dy", "0.8em");
 
-          // -----------------------------
-          // Helper: show / move / hide trend tooltip
-          // -----------------------------
-          function showTrendTooltip(event, emotion, blockIndex) {
-            // Only periods in this row (block)
-            const startIdx = blockIndex * PERIODS_PER_ROW;
-            const endIdx = Math.min(startIdx + PERIODS_PER_ROW, periods.length);
-            const rowPeriods = periods.slice(startIdx, endIdx);
+          gTT.selectAll(".x-axis line").attr("stroke", "#4b5563");
+          gTT.selectAll(".x-axis path").attr("stroke", "#4b5563");
 
-            const series = rowPeriods.map((p) => {
-              const rec = lookup.get(`${emotion}||${p}`);
-              return {
-                period: p,
-                value: rec ? rec.total_count : 0,
-              };
-            });
+          gTT
+            .append("g")
+            .call(yAxis)
+            .selectAll("text")
+            .attr("fill", "#9ca3af")
+            .attr("font-size", 9);
 
-            if (!series.length) return;
+          gTT.selectAll(".y-axis line").attr("stroke", "#1f2937");
+          gTT.selectAll(".y-axis path").attr("stroke", "#4b5563");
 
-            const tooltipWidth = 620; // 👈
-            const tooltipHeight = 150;
-            const tMargin = { top: 22, right: 10, bottom: 40, left: 40 };
-            const innerWidth = tooltipWidth - tMargin.left - tMargin.right;
-            const innerHeight = tooltipHeight - tMargin.top - tMargin.bottom;
+          const line = d3
+            .line()
+            .x((d) => xTT(d.period))
+            .y((d) => yTT(d.value));
 
-            const color = emotionColor(emotion) || "#fbbf24";
+          gTT
+            .append("path")
+            .datum(series)
+            .attr("fill", "none")
+            .attr("stroke", color)
+            .attr("stroke-width", 2)
+            .attr("d", line);
 
-            trendTooltip
-              .style("opacity", 1)
-              .style("left", event.clientX + 14 + "px")
-              .style("top", event.clientY - 10 + "px")
-              .html(""); // clear
+          gTT
+            .selectAll(".trend-point")
+            .data(series)
+            .join("circle")
+            .attr("class", "trend-point")
+            .attr("r", 3)
+            .attr("cx", (d) => xTT(d.period))
+            .attr("cy", (d) => yTT(d.value))
+            .attr("fill", color)
+            .append("title")
+            .text((d) => `${d.period}: ${d.value.toLocaleString()} words`);
+        }
 
-            trendTooltip
-              .append("div")
-              .attr("class", "header")
-              .text(`${emotion} – total word count`);
+        function moveTrendTooltip(event) {
+          trendTooltip
+            .style("left", event.clientX + 14 + "px")
+            .style("top", event.clientY - 10 + "px");
+        }
 
-            trendTooltip
-              .append("div")
-              .attr("class", "sub")
-              .text("Only periods shown in this row");
+        function hideTrendTooltip() {
+          trendTooltip.style("opacity", 0);
+        }
 
-            const svgTT = trendTooltip
-              .append("svg")
-              .attr("width", tooltipWidth)
-              .attr("height", tooltipHeight);
+        // -----------------------------
+        // Cells
+        // -----------------------------
+        const cells = g
+          .selectAll("rect.cell")
+          .data(data)
+          .join("rect")
+          .attr("class", "cell")
+          .attr("x", (d) => {
+            const idx = periodIndex.get(d.period);
+            const col = idx % PERIODS_PER_ROW;
+            return col * cellWidth + cellWidth * 0.1; // small padding
+          })
+          .attr("y", (d) => {
+            const idx = periodIndex.get(d.period);
+            const block = Math.floor(idx / PERIODS_PER_ROW);
+            const blockOffset = block * (blockHeight + blockGap);
+            return blockOffset + yEmotion(d.emotion);
+          })
+          .attr("width", cellWidth * 0.8)
+          .attr("height", yEmotion.bandwidth())
+          .attr("rx", 4)
+          .attr("ry", 4)
+          .attr("fill", (d) => emotionColor(d.emotion) || "#22c55e")
+          .attr("stroke", "#0f172a")
+          .attr("stroke-width", 0.6)
+          .attr("fill-opacity", (d) => {
+            const p = Number.isFinite(d.prop) ? d.prop : 0;
+            const range = emotionRanges.get(d.emotion) || { min: 0, max: 1 };
+            const denom = range.max - range.min || 1e-6;
 
-            const gTT = svgTT
-              .append("g")
-              .attr("transform", `translate(${tMargin.left},${tMargin.top})`);
+            // normalize per emotion to [0,1]
+            let t = (p - range.min) / denom;
+            t = Math.max(0, Math.min(1, t));
 
-            const xTT = d3
-              .scalePoint()
-              .domain(series.map((d) => d.period))
-              .range([0, innerWidth]);
+            const gamma = 0.6; // <1 = more contrast
+            const adjusted = Math.pow(t, gamma);
 
-            const maxVal = d3.max(series, (d) => d.value) || 1;
-            const yTT = d3
-              .scaleLinear()
-              .domain([0, maxVal])
-              .nice()
-              .range([innerHeight, 0]);
-
-            const xAxis = d3.axisBottom(xTT);
-            const yAxis = d3
-              .axisLeft(yTT)
-              .ticks(3)
-              .tickFormat(d3.format(".2s"));
-
-            gTT
-              .append("g")
-              .attr("transform", `translate(0,${innerHeight})`)
-              .call(xAxis)
-              .selectAll("text")
-              .attr("fill", "#e5e7eb")
-              .attr("font-size", 9)
-              .attr("transform", "rotate(-45)")
-              .attr("text-anchor", "end")
-              .attr("dx", "-0.4em")
-              .attr("dy", "0.8em");
-
-            gTT.selectAll(".x-axis line").attr("stroke", "#4b5563");
-            gTT.selectAll(".x-axis path").attr("stroke", "#4b5563");
-
-            gTT
-              .append("g")
-              .call(yAxis)
-              .selectAll("text")
-              .attr("fill", "#9ca3af")
-              .attr("font-size", 9);
-
-            gTT.selectAll(".y-axis line").attr("stroke", "#1f2937");
-            gTT.selectAll(".y-axis path").attr("stroke", "#4b5563");
-
-            const line = d3
-              .line()
-              .x((d) => xTT(d.period))
-              .y((d) => yTT(d.value));
-
-            gTT
-              .append("path")
-              .datum(series)
-              .attr("fill", "none")
-              .attr("stroke", color)
-              .attr("stroke-width", 2)
-              .attr("d", line);
-
-            gTT
-              .selectAll(".trend-point")
-              .data(series)
-              .join("circle")
-              .attr("class", "trend-point")
-              .attr("r", 3)
-              .attr("cx", (d) => xTT(d.period))
-              .attr("cy", (d) => yTT(d.value))
-              .attr("fill", color)
-              .append("title")
-              .text((d) => `${d.period}: ${d.value.toLocaleString()} words`);
-          }
-
-          function moveTrendTooltip(event) {
-            trendTooltip
-              .style("left", event.clientX + 14 + "px")
-              .style("top", event.clientY - 10 + "px");
-          }
-
-          function hideTrendTooltip() {
-            trendTooltip.style("opacity", 0);
-          }
-
-          // -----------------------------
-          // Cells
-          // -----------------------------
-          const cells = g
-            .selectAll("rect.cell")
-            .data(data)
-            .join("rect")
-            .attr("class", "cell")
-            .attr("x", (d) => {
-              const idx = periodIndex.get(d.period);
-              const col = idx % PERIODS_PER_ROW;
-              return col * cellWidth + cellWidth * 0.1; // small padding
-            })
-            .attr("y", (d) => {
-              const idx = periodIndex.get(d.period);
-              const block = Math.floor(idx / PERIODS_PER_ROW);
-              const blockOffset = block * (blockHeight + blockGap);
-              return blockOffset + yEmotion(d.emotion);
-            })
-            .attr("width", cellWidth * 0.8)
-            .attr("height", yEmotion.bandwidth())
-            .attr("rx", 4)
-            .attr("ry", 4)
-            .attr("fill", (d) => emotionColor(d.emotion) || "#22c55e")
-            .attr("stroke", "#0f172a")
-            .attr("stroke-width", 0.6)
-            .attr("fill-opacity", (d) => {
-              const p = Number.isFinite(d.prop) ? d.prop : 0;
-              const range = emotionRanges.get(d.emotion) || { min: 0, max: 1 };
-              const denom = range.max - range.min || 1e-6;
-
-              // normalize per emotion to [0,1]
-              let t = (p - range.min) / denom;
-              t = Math.max(0, Math.min(1, t));
-
-              const gamma = 0.6; // <1 = more contrast
-              const adjusted = Math.pow(t, gamma);
-
-              // map [0,1] -> [0.25, 1]
-              return 0.25 + 0.75 * adjusted;
-            });
-
-          // store original geometry for hover animation
-          cells.each(function (d) {
-            const rect = d3.select(this);
-            d._x = +rect.attr("x");
-            d._y = +rect.attr("y");
-            d._w = +rect.attr("width");
-            d._h = +rect.attr("height");
+            // map [0,1] -> [0.25, 1]
+            return 0.25 + 0.75 * adjusted;
           });
 
-          // Hover interactions for cells
-          cells
-            .on("mouseover", function (event, d) {
+        // store original geometry for hover animation
+        cells.each(function (d) {
+          const rect = d3.select(this);
+          d._x = +rect.attr("x");
+          d._y = +rect.attr("y");
+          d._w = +rect.attr("width");
+          d._h = +rect.attr("height");
+        });
+
+        // Hover interactions for cells
+        cells
+          .on("mouseover", function (event, d) {
+            d3.select(this)
+              .raise()
+              .transition()
+              .duration(120)
+              .attr("x", d._x - 2)
+              .attr("y", d._y - 2)
+              .attr("width", d._w + 4)
+              .attr("height", d._h + 4)
+              .attr("filter", "url(#cellShadow)");
+
+            const color = emotionColor(d.emotion) || "#fbbf24";
+
+            let html = `
+          <div class="header">${d.period}</div>
+          <div>Emotion: <span class="emotion" style="color:${color};">${
+              d.emotion
+            }</span></div>
+          <div>Share of lyrics: ${(d.prop * 100).toFixed(1)}%</div>
+          <div>Total emotion words: ${d.total_count}</div>
+        `;
+            if (d.top_words) {
+              html += `
+            <div class="words">
+              Top words:<br/>
+              ${d.top_words}
+            </div>
+          `;
+            }
+
+            hoverPanel
+              .html(html)
+              .style("opacity", 1)
+              .style("left", event.clientX + 12 + "px")
+              .style("top", event.clientY - 12 + "px");
+          })
+          .on("mousemove", function (event, d) {
+            hoverPanel
+              .style("left", event.clientX + 12 + "px")
+              .style("top", event.clientY - 12 + "px");
+          })
+          .on("mouseout", function (event, d) {
+            d3.select(this)
+              .transition()
+              .duration(120)
+              .attr("x", d._x)
+              .attr("y", d._y)
+              .attr("width", d._w)
+              .attr("height", d._h)
+              .attr("filter", null);
+
+            hoverPanel.style("opacity", 0);
+          });
+
+        // -----------------------------
+        // Emotion labels on left (for each block row) + hover => trend tooltip
+        // -----------------------------
+        const labelsGroup = g.append("g");
+
+        for (let b = 0; b < nBlocks; b++) {
+          const blockOffset = b * (blockHeight + blockGap);
+
+          labelsGroup
+            .selectAll(`.emotion-label-block-${b}`)
+            .data(emotions)
+            .join("text")
+            .attr("class", "emotion-label")
+            .attr("x", -6)
+            .attr(
+              "y",
+              (d) => blockOffset + yEmotion(d) + yEmotion.bandwidth() / 2
+            )
+            .text((d) => d)
+            .on("mouseover", function (event, emotion) {
+              // reset all labels
+              d3.selectAll(".emotion-label")
+                .classed("active", false)
+                .transition()
+                .duration(80)
+                .attr("font-size", 11)
+                .attr("fill", "#e5e7eb")
+                .attr("transform", "translate(0,0)");
+
+              // pop this label
               d3.select(this)
+                .classed("active", true)
                 .raise()
                 .transition()
                 .duration(120)
-                .attr("x", d._x - 2)
-                .attr("y", d._y - 2)
-                .attr("width", d._w + 4)
-                .attr("height", d._h + 4)
-                .attr("filter", "url(#cellShadow)");
+                .attr("font-size", 13)
+                .attr("fill", emotionColor(emotion) || "#facc15")
+                .attr("transform", "translate(2,-2)");
 
-              const color = emotionColor(d.emotion) || "#fbbf24";
-
-              let html = `
-            <div class="header">${d.period}</div>
-            <div>Emotion: <span class="emotion" style="color:${color};">${
-                d.emotion
-              }</span></div>
-            <div>Share of lyrics: ${(d.prop * 100).toFixed(1)}%</div>
-            <div>Total emotion words: ${d.total_count}</div>
-          `;
-              if (d.top_words) {
-                html += `
-              <div class="words">
-                Top words:<br/>
-                ${d.top_words}
-              </div>
-            `;
-              }
-
-              hoverPanel
-                .html(html)
-                .style("opacity", 1)
-                .style("left", event.clientX + 12 + "px")
-                .style("top", event.clientY - 12 + "px");
+              showTrendTooltip(event, emotion, b);
             })
-            .on("mousemove", function (event, d) {
-              hoverPanel
-                .style("left", event.clientX + 12 + "px")
-                .style("top", event.clientY - 12 + "px");
+            .on("mousemove", function (event, emotion) {
+              moveTrendTooltip(event);
             })
-            .on("mouseout", function (event, d) {
+            .on("mouseout", function (event, emotion) {
               d3.select(this)
+                .classed("active", false)
                 .transition()
-                .duration(120)
-                .attr("x", d._x)
-                .attr("y", d._y)
-                .attr("width", d._w)
-                .attr("height", d._h)
-                .attr("filter", null);
+                .duration(150)
+                .attr("font-size", 11)
+                .attr("fill", "#e5e7eb")
+                .attr("transform", "translate(0,0)");
 
-              hoverPanel.style("opacity", 0);
+              hideTrendTooltip();
             });
+        }
 
-          // -----------------------------
-          // Emotion labels on left (for each block row) + hover => trend tooltip
-          // -----------------------------
-          const labelsGroup = g.append("g");
+        // -----------------------------
+        // Period labels under each block
+        // -----------------------------
+        const periodLabelGroup = g.append("g").attr("class", "period-labels");
 
-          for (let b = 0; b < nBlocks; b++) {
-            const blockOffset = b * (blockHeight + blockGap);
+        periods.forEach((p, i) => {
+          const col = i % PERIODS_PER_ROW;
+          const block = Math.floor(i / PERIODS_PER_ROW);
+          const blockOffset = block * (blockHeight + blockGap);
 
-            labelsGroup
-              .selectAll(`.emotion-label-block-${b}`)
-              .data(emotions)
-              .join("text")
-              .attr("class", "emotion-label")
-              .attr("x", -6)
-              .attr(
-                "y",
-                (d) => blockOffset + yEmotion(d) + yEmotion.bandwidth() / 2
-              )
-              .text((d) => d)
-              .on("mouseover", function (event, emotion) {
-                // reset all labels
-                d3.selectAll(".emotion-label")
-                  .classed("active", false)
-                  .transition()
-                  .duration(80)
-                  .attr("font-size", 11)
-                  .attr("fill", "#e5e7eb")
-                  .attr("transform", "translate(0,0)");
+          const xPos = col * cellWidth + cellWidth / 2;
+          const yPos = blockOffset + blockHeight + 12;
 
-                // pop this label
-                d3.select(this)
-                  .classed("active", true)
-                  .raise()
-                  .transition()
-                  .duration(120)
-                  .attr("font-size", 13)
-                  .attr("fill", emotionColor(emotion) || "#facc15")
-                  .attr("transform", "translate(2,-2)");
+          periodLabelGroup
+            .append("text")
+            .attr("x", xPos)
+            .attr("y", yPos)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#e5e7eb")
+            .attr("font-size", 10)
+            .attr("transform", `rotate(-45,${xPos},${yPos})`)
+            .text(p);
+        });
 
-                showTrendTooltip(event, emotion, b);
-              })
-              .on("mousemove", function (event, emotion) {
-                moveTrendTooltip(event);
-              })
-              .on("mouseout", function (event, emotion) {
-                d3.select(this)
-                  .classed("active", false)
-                  .transition()
-                  .duration(150)
-                  .attr("font-size", 11)
-                  .attr("fill", "#e5e7eb")
-                  .attr("transform", "translate(0,0)");
+        // -----------------------------
+        // Optional annotations by period
+        // -----------------------------
+        const annotations = {
+          1929: "Wall St. crash,\nGreat Depression",
+          1940: "WWII, early years",
+          1945: "WWII end,\npost-war shift",
+          1963: "JFK assassination",
+          1969: "Moon landing,\nWoodstock",
+          1980: "Late Cold War,\nMTV era",
+          1991: "Cold War ends,\nGulf War",
+          2001: "9/11,\nWar on Terror",
+          2008: "Global financial\ncrisis",
+        };
 
-                hideTrendTooltip();
-              });
+        const annoGroup = g.append("g");
+
+        Object.entries(annotations).forEach(([periodKey, text]) => {
+          // Coerce to same type as periods[0]
+          const period =
+            typeof periods[0] === "number" ? +periodKey : periodKey;
+
+          if (!periods.includes(period)) {
+            console.warn("Annotation period not found in data:", period);
+            return;
           }
 
-          // -----------------------------
-          // Period labels under each block
-          // -----------------------------
-          const periodLabelGroup = g.append("g").attr("class", "period-labels");
+          const idx = periodIndex.get(period);
+          const col = idx % PERIODS_PER_ROW;
+          const block = Math.floor(idx / PERIODS_PER_ROW);
+          const blockOffset = block * (blockHeight + blockGap);
 
-          periods.forEach((p, i) => {
-            const col = i % PERIODS_PER_ROW;
-            const block = Math.floor(i / PERIODS_PER_ROW);
-            const blockOffset = block * (blockHeight + blockGap);
+          const labelOffset = 5;
+          const xPos = col * cellWidth + cellWidth / 2;
+          const yPos = blockOffset - labelOffset;
 
-            const xPos = col * cellWidth + cellWidth / 2;
-            const yPos = blockOffset + blockHeight + 12;
-
-            periodLabelGroup
-              .append("text")
-              .attr("x", xPos)
-              .attr("y", yPos)
-              .attr("text-anchor", "middle")
-              .attr("fill", "#e5e7eb")
-              .attr("font-size", 10)
-              .attr("transform", `rotate(-45,${xPos},${yPos})`)
-              .text(p);
-          });
-
-          // -----------------------------
-          // Optional annotations by period
-          // -----------------------------
-          const annotations = {
-            1929: "Wall St. crash,\nGreat Depression",
-            1940: "WWII, early years",
-            1945: "WWII end,\npost-war shift",
-            1963: "JFK assassination",
-            1969: "Moon landing,\nWoodstock",
-            1980: "Late Cold War,\nMTV era",
-            1991: "Cold War ends,\nGulf War",
-            2001: "9/11,\nWar on Terror",
-            2008: "Global financial\ncrisis",
-          };
-
-          const annoGroup = g.append("g");
-
-          Object.entries(annotations).forEach(([periodKey, text]) => {
-            // Coerce to same type as periods[0]
-            const period =
-              typeof periods[0] === "number" ? +periodKey : periodKey;
-
-            if (!periods.includes(period)) {
-              console.warn("Annotation period not found in data:", period);
-              return;
-            }
-
-            const idx = periodIndex.get(period);
-            const col = idx % PERIODS_PER_ROW;
-            const block = Math.floor(idx / PERIODS_PER_ROW);
-            const blockOffset = block * (blockHeight + blockGap);
-
-            const labelOffset = 5;
-            const xPos = col * cellWidth + cellWidth / 2;
-            const yPos = blockOffset - labelOffset;
-
-            annoGroup
-              .append("text")
-              .attr("class", "event-label")
-              .attr("x", xPos)
-              .attr("y", yPos)
-              .attr("text-anchor", "middle")
-              .text(text);
-          });
-
-          // -----------------------------
-          // Legend
-          // -----------------------------
-          const legend = svg
-            .append("g")
-            .attr("transform", `translate(${width - 150}, ${margin.top})`);
-
-          legend
+          annoGroup
             .append("text")
-            .attr("class", "legend-title")
-            .attr("x", 0)
-            .attr("y", 0)
-            .text("Emotions");
-
-          const legendItems = legend
-            .selectAll(".legend-item")
-            .data(emotions)
-            .join("g")
-            .attr("class", "legend-item")
-            .attr("transform", (d, i) => `translate(0, ${(i + 1) * 18})`);
-
-          legendItems
-            .append("rect")
-            .attr("x", 0)
-            .attr("y", -10)
-            .attr("width", 14)
-            .attr("height", 14)
-            .attr("rx", 3)
-            .attr("fill", (d) => emotionColor(d) || "#6b7280")
-            .attr("fill-opacity", 1);
-
-          legendItems
-            .append("text")
-            .attr("class", "legend-text")
-            .attr("x", 20)
-            .attr("y", 0)
-            .attr("dy", "0.35em")
-            .text((d) => d);
-
-          // Intensity legend
-          const intensityLegend = legend
-            .append("g")
-            .attr("transform", `translate(0, ${(emotions.length + 2) * 18})`);
-
-          intensityLegend
-            .append("text")
-            .attr("class", "legend-title")
-            .attr("x", 0)
-            .attr("y", 0)
-            .text("Intensity (share)");
-
-          const gradWidth = 80;
-          const gradHeight = 10;
-
-          const gradG = intensityLegend
-            .append("g")
-            .attr("transform", "translate(0, 8)");
-
-          gradG
-            .append("rect")
-            .attr("x", 0)
-            .attr("y", 0)
-            .attr("width", gradWidth)
-            .attr("height", gradHeight)
-            .attr("fill", "#fbbf24")
-            .attr("fill-opacity", 0.15);
-
-          gradG
-            .append("rect")
-            .attr("x", gradWidth / 2)
-            .attr("y", 0)
-            .attr("width", gradWidth / 2)
-            .attr("height", gradHeight)
-            .attr("fill", "#fbbf24")
-            .attr("fill-opacity", 1);
-
-          intensityLegend
-            .append("text")
-            .attr("class", "legend-text")
-            .attr("x", 0)
-            .attr("y", gradHeight + 20)
-            .text("lighter = lower share, darker = higher share");
-        })
-        .catch((err) => {
-          console.error("Error loading CSV:", err);
-          document.body.insertAdjacentHTML(
-            "beforeend",
-            `<p style="color:red; margin:16px;">Error loading CSV: ${err}</p>`
-          );
+            .attr("class", "event-label")
+            .attr("x", xPos)
+            .attr("y", yPos)
+            .attr("text-anchor", "middle")
+            .text(text);
         });
-    </script>
-  </body>
-</html>
+
+        // -----------------------------
+        // Legend
+        // -----------------------------
+        const legend = svg
+          .append("g")
+          .attr("transform", `translate(${width - 150}, ${margin.top})`);
+
+        legend
+          .append("text")
+          .attr("class", "legend-title")
+          .attr("x", 0)
+          .attr("y", 0)
+          .text("Emotions");
+
+        const legendItems = legend
+          .selectAll(".legend-item")
+          .data(emotions)
+          .join("g")
+          .attr("class", "legend-item")
+          .attr("transform", (d, i) => `translate(0, ${(i + 1) * 18})`);
+
+        legendItems
+          .append("rect")
+          .attr("x", 0)
+          .attr("y", -10)
+          .attr("width", 14)
+          .attr("height", 14)
+          .attr("rx", 3)
+          .attr("fill", (d) => emotionColor(d) || "#6b7280")
+          .attr("fill-opacity", 1);
+
+        legendItems
+          .append("text")
+          .attr("class", "legend-text")
+          .attr("x", 20)
+          .attr("y", 0)
+          .attr("dy", "0.35em")
+          .text((d) => d);
+
+        // Intensity legend
+        const intensityLegend = legend
+          .append("g")
+          .attr("transform", `translate(0, ${(emotions.length + 2) * 18})`);
+
+        intensityLegend
+          .append("text")
+          .attr("class", "legend-title")
+          .attr("x", 0)
+          .attr("y", 0)
+          .text("Intensity (share)");
+
+        const gradWidth = 80;
+        const gradHeight = 10;
+
+        const gradG = intensityLegend
+          .append("g")
+          .attr("transform", "translate(0, 8)");
+
+        gradG
+          .append("rect")
+          .attr("x", 0)
+          .attr("y", 0)
+          .attr("width", gradWidth)
+          .attr("height", gradHeight)
+          .attr("fill", "#fbbf24")
+          .attr("fill-opacity", 0.15);
+
+        gradG
+          .append("rect")
+          .attr("x", gradWidth / 2)
+          .attr("y", 0)
+          .attr("width", gradWidth / 2)
+          .attr("height", gradHeight)
+          .attr("fill", "#fbbf24")
+          .attr("fill-opacity", 1);
+
+        intensityLegend
+          .append("text")
+          .attr("class", "legend-text")
+          .attr("x", 0)
+          .attr("y", gradHeight + 20)
+          .text("lighter = lower share, darker = higher share");
+      })
+      .catch((err) => {
+        console.error("Error loading CSV:", err);
+        document.body.insertAdjacentHTML(
+          "beforeend",
+          `<p style="color:red; margin:16px;">Error loading CSV: ${err}</p>`
+        );
+      });
+  </script>
+</body>
