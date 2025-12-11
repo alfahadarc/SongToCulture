@@ -19,8 +19,8 @@
   }
   .eyebrow { text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px; color: #99a5c8; margin-bottom: 6px; }
   h1 { margin: 0 0 6px; font-size: 28px; }
-  .lede { margin: 0 0 18px; color: #cdd5e7; line-height: 1.6; max-width: 900px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+  .lede { margin: 0 0 18px; color: #cdd5e7; line-height: 1.6;}
+  .grid { display: grid; gap: 16px; align-items: start; }
   .section {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.07);
@@ -29,13 +29,13 @@
   }
   .section h2 {
     margin: 0 0 8px;
-    font-size: 14px;
+    font-size: 1.2rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #a7b3ce;
   }
   .bullets { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-  .bullets li { position: relative; padding-left: 16px; line-height: 1.5; }
+  .bullets li { position: relative; padding-left: 2rem; line-height: 1.5; font-size: 2rem;}
   .bullets li::before { content: "•"; position: absolute; left: 0; color: #79d8ff; }
   .pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 0; }
   .pill {
@@ -43,11 +43,12 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 999px;
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 1rem;
     color: #e9edf5;
     white-space: nowrap;
   }
   .note { color: #b8c3dc; margin-top: 8px; font-size: 13px; line-height: 1.5; }
+  ul li { font-size: 1rem; }
   .callout {
     border: 1px solid rgba(121, 216, 255, 0.5);
     background: linear-gradient(135deg, rgba(121, 216, 255, 0.15), rgba(255, 255, 255, 0));
@@ -60,7 +61,7 @@
   <div class="eyebrow">Dataset profile</div>
   <h1 class="dataset">Million Song Dataset (MSD)</h1>
   <p class="lede">
-    One million tracks of mostly Western popular music with high-level audio descriptors, song metadata, and artist similarity links—built as a benchmark for large-scale music information retrieval.
+    One million tracks of mostly Western popular music with high-level audio descriptors, song metadata, and artist similarity links.
   </p>
 
   <div class="grid">
@@ -73,14 +74,14 @@
       </ul>
     </div>
 
-    <div class="section callout">
+    <!-- <div class="section callout">
       <h2>Used for </h2>
       <ul class="bullets">
         <li>Trend studies of keys, modes, and energetic profile changes across years.</li>
         <li>Prototyping recommendation or similarity graphs with the built-in artist links.</li>
         <li>Multimodal analyses when paired with lyrics (MXM), tags (Last.fm), or symbolic MIDI (Lakh).</li>
       </ul>
-    </div>
+    </div> -->
   </div>
 
   <div class="grid" style="margin-top: 14px;">

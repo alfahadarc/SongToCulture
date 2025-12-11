@@ -1,7 +1,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>MusiXmatch Lyrics Dataset</title>
-<style>
+<!-- <style>
   :root { color-scheme: dark; }
   body {
     margin: 0;
@@ -19,7 +19,7 @@
   }
   .eyebrow { text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px; color: #99a5c8; margin-bottom: 6px; }
   h1 { margin: 0 0 6px; font-size: 28px; }
-  .lede { margin: 0 0 18px; color: #cdd5e7; line-height: 1.6; max-width: 900px; }
+  .lede { margin: 0 0 18px; color: #cdd5e7; line-height: 1.6; }
   .grid { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
   .section {
     background: rgba(255, 255, 255, 0.03);
@@ -43,7 +43,7 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 999px;
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 1rem;
     color: #e9edf5;
     white-space: nowrap;
   }
@@ -55,12 +55,12 @@
   @media (max-width: 920px) {
     .grid { grid-template-columns: 1fr; }
   }
-</style>
+</style> -->
 <body>
   <div class="eyebrow">Dataset profile</div>
   <h1 class="dataset">MusiXmatch Lyrics Dataset (MXM)</h1>
   <p class="lede">
-    Official lyrics companion to the MSD: each track is expressed as bag-of-words counts over a 5,000-word vocabulary, making lyric-driven mood and topic analysis straightforward.
+    Official lyrics companion to the MSD.
   </p>
 
   <div class="grid">
@@ -68,19 +68,19 @@
       <h2>Scope & Coverage</h2>
       <ul class="bullets">
         <li>Lyrics for MSD tracks in a sparse bag-of-words format.</li>
-        <li>Counts mapped to a fixed dictionary of the 5,000 most frequent terms.</li>
+        <li>Counts mapped to a fixed dictionary of the 5,000 most frequent words.</li>
         <li>Each row links back to the MSD track ID for easy joins with audio features.</li>
       </ul>
     </div>
 
-    <div class="section callout">
+    <!-- <div class="section callout">
       <h2>Used for </h2>
       <ul class="bullets">
         <li>Topic modeling or clustering to surface lyrical themes over time.</li>
         <li>Sentiment, mood, or profanity filtering without needing raw text.</li>
         <li>Lyrics-similarity search or blending with audio/tags for hybrid recommendations.</li>
       </ul>
-    </div>
+    </div> -->
   </div>
 
   <div class="grid" style="margin-top: 14px;">
@@ -91,14 +91,12 @@
         <span class="pill">word_index</span>
         <span class="pill">word_count</span>
         <span class="pill">vocab_size</span>
-        <span class="pill">bag_of_words</span>
       </div>
       <p class="note">
         <ul>
           <li>word_index: Index of the word in the fixed 5,000-word vocabulary.</li>
           <li>word_count: Number of times the word appears in the track's lyrics.</li>
           <li>vocab_size: Total number of unique words in the vocabulary (5,000).</li>
-          <li>bag_of_words: Sparse representation of the lyrics as word counts.</li>
         </ul>
       </p>
     </div>
