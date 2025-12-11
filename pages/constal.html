@@ -283,7 +283,7 @@
       let sim = null; // force simulation
 
       Promise.all([
-        d3.csv("./Data/filtered_artist_mbtag_nano.csv"),
+        d3.csv("./Data/filtered_artist_term_final.csv"),
         d3.csv("./Data/filtered_artist_sim.csv"),
         d3.csv("./Data/filtered_songs.csv"),
       ])
@@ -621,9 +621,9 @@
 
           linkSel.classed("dimmed", false).classed("link-highlight", false);
 
-          panelArtist.html("—");
-          panelNeighbor.html("—");
-          panelDetails.html("—");
+          // panelArtist.html("—");
+          // panelNeighbor.html("—");
+          // panelDetails.html("—");
         }
 
         function drag() {
