@@ -17,7 +17,7 @@
         position: absolute;
         top: 0;
         left: 0;
-        width: 260px;
+        width: 25vw;
         height: 100vh;
         padding: 14px 16px;
         background: #020617;
@@ -26,16 +26,16 @@
       }
       .sidebar h2 {
         margin: 0 0 4px 0;
-        font-size: 18px;
+        font-size: 2rem;
       }
       .sidebar p {
         margin: 0 0 12px 0;
-        font-size: 12px;
+        font-size: 1.2rem;
         color: #9ca3af;
       }
       .control-group {
         margin-bottom: 12px;
-        font-size: 12px;
+        font-size: 1.2rem;
       }
       .control-group label {
         display: block;
@@ -56,14 +56,14 @@
         border-radius: 8px;
         background: #0b1220;
         border: 1px solid #1f2937;
-        font-size: 12px;
+        font-size: 1.2rem;
         min-height: 80px;
         box-sizing: border-box;
       }
       .const-title {
         font-weight: 600;
         margin-bottom: 4px;
-        font-size: 13px;
+        font-size: 1.6rem;
       }
       .const-section {
         margin-top: 6px;
@@ -72,15 +72,15 @@
         font-weight: 500;
         margin-bottom: 2px;
         color: #9ca3af;
-        font-size: 11px;
+        font-size: 1.2rem;
         text-transform: uppercase;
         letter-spacing: 0.04em;
       }
       #chart {
         position: absolute;
-        left: 260px;
+        left: 25vw;
         top: 0;
-        width: calc(100vw - 260px);
+        width: calc(100vw - 25vw);
         height: 100vh;
         background: radial-gradient(circle at center, #020617 0%, #000 100%);
       }
@@ -144,10 +144,12 @@
   </head>
   <body>
     <div class="sidebar">
-      <h2>Neon Constellations</h2>
+      <h2>Artists Constellations</h2>
       <p>
-        Artists with strong tags (≥100). Color = term, size = familiarity,
-        brightness = hotness. Hover to pop a community.
+        Artists with strong tags (≥100). 
+        <br>Color = term, 
+        <br>size = familiarity,
+        <br>brightness = hotness. 
       </p>
 
       <div class="control-group">
@@ -186,7 +188,7 @@
     <div class="tooltip" id="tooltip"></div>
 
     <script>
-      const width = window.innerWidth - 260;
+      const width = window.innerWidth - window.innerWidth * 0.25;
       const height = window.innerHeight;
 
       const svg = d3
