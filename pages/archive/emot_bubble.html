@@ -106,6 +106,10 @@
 
       // For panel content: emotion -> [{decade, word, count}, ...]
       let emotionIndex = new Map();
+      let lastPanelEmotion = null;
+      const panelCache = new Map();
+      const highlightState = { emotion: null, word: null };
+      let highlightScheduled = false;
 
       // ---------------------------------------------------------
       // Load stopwords + ALL decade files
@@ -294,61 +298,76 @@
             .attr("font-weight", "600")
             .text("Emotion Bubble Charts by Decade");
 
-          // Helper: highlight bubbles for a given emotion/word
-          function updateHighlight(activeEmotion, activeWord) {
+          // Helper: highlight bubbles for a given emotion/word (throttled)
+          function requestHighlight(activeEmotion, activeWord) {
+            if (
+              highlightState.emotion === activeEmotion &&
+              highlightState.word === activeWord
+            ) {
+              return;
+            }
+            highlightState.emotion = activeEmotion;
+            highlightState.word = activeWord;
+            if (highlightScheduled) return;
+            highlightScheduled = true;
+            requestAnimationFrame(applyHighlight);
+          }
+
+          function applyHighlight() {
+            highlightScheduled = false;
+            const { emotion: activeEmotion, word: activeWord } = highlightState;
             const nodeSelection = svg.selectAll(".node");
 
             nodeSelection.each(function (nd) {
               const circle = d3.select(this).select("circle");
               const label = d3.select(this).select("text.word-label");
-
               const baseR = nd.originalR || nd.r;
 
               let r = baseR;
               let fillOpacity = 0.9;
               let labelOpacity = 1.0;
 
-              if (!activeEmotion) {
-                // No selection: reset style
-                r = baseR;
-                fillOpacity = 0.9;
-                labelOpacity = 1.0;
-              } else {
+              if (activeEmotion) {
                 const sameEmotion = nd.data.emotion === activeEmotion;
                 const isHovered = sameEmotion && nd.data.word === activeWord;
 
                 if (sameEmotion) {
-                  // Highlight all same-emotion bubbles, extra for hovered one
                   r = baseR * (isHovered ? 1.3 : 1.15);
                   fillOpacity = 1.0;
                   labelOpacity = 1.0;
                 } else {
-                  // Dim others
-                  r = baseR;
                   fillOpacity = 0.15;
                   labelOpacity = 0.15;
                 }
               }
 
               circle
+                .interrupt()
                 .transition()
                 .duration(200)
                 .attr("r", r)
                 .attr("fill-opacity", fillOpacity);
 
-              label.transition().duration(200).style("opacity", labelOpacity);
+              label
+                .interrupt()
+                .transition()
+                .duration(200)
+                .style("opacity", labelOpacity);
             });
           }
 
           // Helper: update side panel content (bar charts) for an emotion
           // Helper: update side panel content (VERTICAL bar charts) for an emotion
           function updatePanel(emotion) {
+            if (emotion === lastPanelEmotion) return;
+            lastPanelEmotion = emotion || null;
+
             const panel = d3.select("#emotion-panel");
-            panel.selectAll("*").remove();
-            const panelNode = document.getElementById("emotion-panel");
-            const panelWidth = panelNode.clientWidth || 320; // read real width
+            const panelNode = panel.node();
+            const panelWidth = panelNode ? panelNode.clientWidth || 320 : 320; // read real width
 
             if (!emotion) {
+              panel.selectAll("*").remove();
               panel
                 .append("div")
                 .attr("class", "placeholder")
@@ -357,6 +376,13 @@
                 );
               return;
             }
+
+            if (panelCache.has(emotion)) {
+              panel.html(panelCache.get(emotion));
+              return;
+            }
+
+            panel.selectAll("*").remove();
 
             const list = emotionIndex.get(emotion) || [];
 
@@ -493,6 +519,8 @@
 
               g.selectAll(".y-axis path").attr("stroke", "#1f2937");
             });
+
+            panelCache.set(emotion, panelNode.innerHTML);
           }
 
           // Pack layout template
@@ -559,11 +587,11 @@
               .attr("stroke-width", 1)
               .attr("filter", "url(#bubbleShadow)")
               .on("mouseover", function (event, d) {
-                updateHighlight(d.data.emotion, d.data.word);
+                requestHighlight(d.data.emotion, d.data.word);
                 updatePanel(d.data.emotion); // panel stays on last hovered
               })
               .on("mouseout", function (event, d) {
-                updateHighlight(null, null); // reset bubbles only
+                requestHighlight(null, null); // reset bubbles only
                 // do NOT clear panel here
               });
 
