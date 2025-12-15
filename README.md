@@ -1,32 +1,24 @@
-# Slide + D3 Presentation Skeleton
+## 🎶 Song to Culture: Unveiling Global Music Trends
 
-This is a minimal, visually polished scaffold for doing a full presentation on the web with two kinds of pages:
-- **Slide pages**: just HTML snippets you can edit quickly (`pages/slide-*.html`).
-- **D3 pages**: standalone HTML files with their own JS/D3 logic, sandboxed in iframes (`pages/d3-*.html`).
+Music is a universal language that reflects and shapes culture. The objective of this project, **"Song to Culture,"** is to utilize **interactive data visualization** to uncover patterns, trends, and relationships within global music data.
 
-The **parent** (`index.html`) controls scrolling, navigation, progress, keyboard shortcuts, and lazy loading.
+By bridging raw **audio features**, **lyrical content**, and **metadata**, we aim to provide an immersive narrative on how musical attributes correlate with cultural phenomena (such as emotion, location, and popularity).
 
-## Quick start
-Open `index.html` in a browser (double-click). Use ↑ / ↓ or the buttons to navigate. Dots on the right jump to any page. URL hash updates like `#/3` so you can deep-link.
+---
 
-## Add or reorder pages
-In `index.html`, duplicate one of the `<section class="page" ...>` blocks and change:
-- `data-type="slide"` or `data-type="d3"`
-- `data-src` to your new file path under `pages/`
+### 💿 Datasets Used
 
-The parent lazy-loads the current page and its neighbors, so you can scale to many pages.
+This project relies on the integration of several widely-recognized music datasets to provide a comprehensive analysis:
 
-## Customize the look
-Edit `assets/css/style.css`:
-- Typography, colors, gradients (via CSS variables)
-- Card look for slides and the iframe wrapper
-- Scroll-snap behavior and reveal animation
+* **Million Song Dataset (MSD):**
+    * The primary source for **audio features** and **metadata** for contemporary popular music.
+* **MusiXmatch Lyrics Dataset (MXM):**
+    * Provides the **lyrical content** required for text and sentiment analysis.
+* **Lakh MIDI Dataset (LMD):**
+    * Aligns symbolic music data (MIDI) to offer deeper **structural insights**.
 
-## Keyboard & API
-- Up/Down, PageUp/PageDown, Space: navigate
-- `window.Deck.next()` / `window.Deck.prev()` / `window.Deck.goTo(n)` for scripting
+### 🚀 Deployed Application
 
-## Alternatives
-- If you prefer **no iframes** for D3 pages, convert them to slide pages and move their JS into inline `<script type="module">` within fetched HTML. Then tweak `ensureLoaded` in `assets/js/main.js` to execute scripts. The iframe route keeps isolation and avoids script-eval complexity.
+Experience the interactive visualization:
 
-Enjoy!
+[https://dv-presentation.mmmz.top/](https://dv-presentation.mmmz.top/)
